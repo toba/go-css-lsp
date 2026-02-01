@@ -1,6 +1,12 @@
 {
   "version": 1,
   "beans": {
+    "gocss0zn6": {
+      "clickup": {
+        "task_id": "868han850",
+        "synced_at": "2026-02-01T22:03:51.096116Z"
+      }
+    },
     "gocss3c30": {
       "clickup": {
         "task_id": "868han40m",
@@ -17,6 +23,12 @@
       "clickup": {
         "task_id": "868han40n",
         "synced_at": "2026-02-01T21:40:41.427394Z"
+      }
+    },
+    "gocss9pnh": {
+      "clickup": {
+        "task_id": "868han851",
+        "synced_at": "2026-02-01T22:03:51.239699Z"
       }
     },
     "gocssc9u6": {
@@ -53,6 +65,12 @@
       "clickup": {
         "task_id": "868han40x",
         "synced_at": "2026-02-01T21:40:41.595598Z"
+      }
+    },
+    "gocssmp25": {
+      "clickup": {
+        "task_id": "868han852",
+        "synced_at": "2026-02-01T22:03:51.347629Z"
       }
     },
     "gocssnrkb": {
