@@ -20,6 +20,11 @@ const (
 	// FormatPreserve keeps original single/multi-line layout
 	// and normalizes whitespace only.
 	FormatPreserve
+	// FormatDetect infers single-line intent from whether the
+	// first property is on the same line as the opening brace.
+	// If so and the result fits PrintWidth, single-line;
+	// otherwise multi-line.
+	FormatDetect
 )
 
 // FormatOptions controls CSS formatting behavior.
@@ -80,7 +85,17 @@ func (f *formatter) writeIndent() {
 func (f *formatter) formatStylesheet(ss *parser.Stylesheet) {
 	for i, child := range ss.Children {
 		if i > 0 {
-			f.buf.WriteByte('\n')
+			switch f.opts.Mode {
+			case FormatCompact:
+				// No blank lines between rules.
+			case FormatPreserve, FormatDetect:
+				f.writePreservedBlankLines(
+					ss.Children[i-1].End(),
+					child.Offset(),
+				)
+			default:
+				f.buf.WriteByte('\n')
+			}
 		}
 
 		switch n := child.(type) {
@@ -109,6 +124,8 @@ func (f *formatter) dispatchRuleset(rs *parser.Ruleset) {
 		f.formatRulesetCompact(rs)
 	case FormatPreserve:
 		f.formatRulesetPreserve(rs)
+	case FormatDetect:
+		f.formatRulesetDetect(rs)
 	default:
 		f.formatRuleset(rs)
 	}
@@ -131,12 +148,12 @@ func (f *formatter) formatRuleset(rs *parser.Ruleset) {
 			f.formatDeclaration(n)
 		case *parser.Ruleset:
 			if i > 0 {
-				f.buf.WriteByte('\n')
+				f.writeNestedBlankLine(rs.Children, i)
 			}
 			f.dispatchRuleset(n)
 		case *parser.AtRule:
 			if i > 0 {
-				f.buf.WriteByte('\n')
+				f.writeNestedBlankLine(rs.Children, i)
 			}
 			f.formatAtRule(n)
 		case *parser.Comment:
@@ -359,7 +376,9 @@ func (f *formatter) formatAtRule(ar *parser.AtRule) {
 		for i, child := range ar.Block.Children {
 			if i > 0 {
 				if _, isDecl := child.(*parser.Declaration); !isDecl {
-					f.buf.WriteByte('\n')
+					f.writeNestedBlankLine(
+						ar.Block.Children, i,
+					)
 				}
 			}
 			switch n := child.(type) {
@@ -550,18 +569,106 @@ func (f *formatter) isOriginalSingleLine(
 }
 
 // formatRulesetPreserve keeps the original single-line vs
-// multi-line structure, normalizing whitespace only.
+// multi-line structure, normalizing whitespace only. Adds a
+// print-width gate so overly long single-line rules expand.
 func (f *formatter) formatRulesetPreserve(
 	rs *parser.Ruleset,
 ) {
 	if !hasNestedRules(rs) &&
 		f.isOriginalSingleLine(rs.StartPos, rs.EndPos) {
 		line := f.buildSingleLine(rs)
-		f.writeIndent()
-		f.buf.WriteString(line)
-		f.buf.WriteByte('\n')
-		return
+		totalWidth := f.indentWidth() + len(line)
+		if totalWidth <= f.opts.PrintWidth {
+			f.writeIndent()
+			f.buf.WriteString(line)
+			f.buf.WriteByte('\n')
+			return
+		}
 	}
 
 	f.formatRuleset(rs)
+}
+
+// isFirstChildInline reports whether the first child of a
+// ruleset is on the same line as the opening brace.
+func (f *formatter) isFirstChildInline(
+	rs *parser.Ruleset,
+) bool {
+	if len(rs.Children) == 0 {
+		return true
+	}
+	// Find the opening brace after the selector.
+	bracePos := -1
+	start := 0
+	if rs.Selectors != nil {
+		start = rs.Selectors.EndPos
+	}
+	for i := start; i < len(f.src); i++ {
+		if f.src[i] == '{' {
+			bracePos = i
+			break
+		}
+	}
+	if bracePos < 0 {
+		return false
+	}
+	// Check for newline between brace and first child.
+	firstOffset := rs.Children[0].Offset()
+	return !bytes.ContainsRune(
+		f.src[bracePos:firstOffset], '\n',
+	)
+}
+
+// formatRulesetDetect infers single-line intent from whether
+// the first property is on the same line as the opening brace.
+func (f *formatter) formatRulesetDetect(
+	rs *parser.Ruleset,
+) {
+	if !hasNestedRules(rs) && f.isFirstChildInline(rs) {
+		line := f.buildSingleLine(rs)
+		totalWidth := f.indentWidth() + len(line)
+		if totalWidth <= f.opts.PrintWidth {
+			f.writeIndent()
+			f.buf.WriteString(line)
+			f.buf.WriteByte('\n')
+			return
+		}
+	}
+
+	f.formatRuleset(rs)
+}
+
+// writePreservedBlankLines writes at most one blank line based
+// on the number of newlines in the source between prevEnd and
+// nextStart. Each rule already emits a trailing \n, so we need
+// 2+ newlines in the gap to produce a blank line.
+func (f *formatter) writePreservedBlankLines(
+	prevEnd, nextStart int,
+) {
+	if prevEnd < 0 || nextStart > len(f.src) {
+		return
+	}
+	gap := f.src[prevEnd:nextStart]
+	nlCount := bytes.Count(gap, []byte{'\n'})
+	if nlCount >= 2 {
+		f.buf.WriteByte('\n')
+	}
+}
+
+// writeNestedBlankLine writes the blank line before a nested
+// ruleset or at-rule inside a parent ruleset, respecting mode.
+func (f *formatter) writeNestedBlankLine(
+	children []parser.Node, i int,
+) {
+	switch f.opts.Mode {
+	case FormatCompact:
+		// No blank lines.
+	case FormatPreserve, FormatDetect:
+		f.writePreservedBlankLines(
+			children[i-1].End(),
+			children[i].Offset(),
+		)
+	default:
+		f.buf.WriteByte('\n')
+	}
 }

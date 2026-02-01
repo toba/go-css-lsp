@@ -263,10 +263,11 @@ func TestFormatPreserve_NormalizeBadSpacingMultiLine(t *testing.T) {
 }
 
 func TestFormatPreserve_MixedRules(t *testing.T) {
+	// Source has only 1 newline between rules → no blank line.
 	src := []byte(".foo { color: red; }\n.bar {\n  background: blue;\n}")
 	ss, _ := parser.Parse(src)
 	result := Format(ss, src, preserveOpts())
-	expected := ".foo { color: red; }\n\n.bar {\n  background: blue;\n}\n"
+	expected := ".foo { color: red; }\n.bar {\n  background: blue;\n}\n"
 	if result != expected {
 		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
 	}
@@ -367,10 +368,9 @@ func TestFormatCompact_NestedFallsBackToExpanded(t *testing.T) {
 	ss, _ := parser.Parse(src)
 	result := Format(ss, src, compactOpts(80))
 	// Parent falls back to expanded due to nested rules;
-	// nested leaf rulesets may still be compacted.
+	// compact mode: no blank line before nested rule.
 	expected := `.parent {
   color: red;
-
   &:hover { color: blue; }
 }
 `
@@ -522,14 +522,157 @@ func TestFormatPreserve_NestedFallsBackToExpanded(t *testing.T) {
 	ss, _ := parser.Parse(src)
 	result := Format(ss, src, preserveOpts())
 	// Parent falls back to expanded due to nested rules;
-	// nested leaf rulesets keep original single-line layout.
+	// source is single-line: no blank line in gap.
 	expected := `.parent {
   color: red;
-
   .child { font-size: 14px; }
 }
 `
 	if result != expected {
 		t.Errorf("got:\n%s\nwant:\n%s", result, expected)
+	}
+}
+
+// --- Detect mode tests ---
+
+func detectOpts(printWidth int) FormatOptions {
+	return FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		Mode:         FormatDetect,
+		PrintWidth:   printWidth,
+	}
+}
+
+func TestFormatDetect_InlineFirstPropFits(t *testing.T) {
+	// First prop is inline with { and fits → single line
+	src := []byte(`.foo { color: red;
+  background: blue;
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := ".foo { color: red; background: blue; }\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_FirstPropOnNewLine(t *testing.T) {
+	// First prop on new line → stays multi-line
+	src := []byte(`.foo {
+  color: red;
+  background: blue;
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := ".foo {\n  color: red;\n  background: blue;\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_InlineExceedsPrintWidth(t *testing.T) {
+	// First prop inline but result exceeds print-width → multi-line
+	src := []byte(`.foo { color: red; background: blue; }`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(20))
+	expected := ".foo {\n  color: red;\n  background: blue;\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+// --- Blank line handling tests ---
+
+func TestFormatCompact_NoBlankLinesBetweenTopLevelRules(t *testing.T) {
+	src := []byte(".foo { color: red; }\n\n.bar { color: blue; }")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, compactOpts(80))
+	expected := ".foo { color: red; }\n.bar { color: blue; }\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatPreserve_NoBlankLinesInSource(t *testing.T) {
+	// 0 blank lines in source → 0 in output
+	src := []byte(".foo { color: red; }\n.bar { color: blue; }")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, preserveOpts())
+	expected := ".foo { color: red; }\n.bar { color: blue; }\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatPreserve_OneBlankLineInSource(t *testing.T) {
+	// 1 blank line in source → 1 in output
+	src := []byte(".foo { color: red; }\n\n.bar { color: blue; }")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, preserveOpts())
+	expected := ".foo { color: red; }\n\n.bar { color: blue; }\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatPreserve_ManyBlankLinesCollapsed(t *testing.T) {
+	// 3+ blank lines in source → collapsed to 1
+	src := []byte(".foo { color: red; }\n\n\n\n.bar { color: blue; }")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, preserveOpts())
+	expected := ".foo { color: red; }\n\n.bar { color: blue; }\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatCompact_NoBlankLineBeforeNestedRules(t *testing.T) {
+	src := []byte(".parent {\n  color: red;\n\n  &:hover {\n    color: blue;\n  }\n}")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, compactOpts(80))
+	expected := ".parent {\n  color: red;\n  &:hover { color: blue; }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatPreserve_NestedNoBlankLinesInSource(t *testing.T) {
+	src := []byte(".parent {\n  color: red;\n  &:hover {\n    color: blue;\n  }\n}")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, preserveOpts())
+	expected := ".parent {\n  color: red;\n  &:hover {\n    color: blue;\n  }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormat_ExpandedStillHasBlankLines(t *testing.T) {
+	// Expanded mode: blank line before nested rule (regression check)
+	src := []byte(`.parent{color:red;&:hover{color:blue;}}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+	expected := ".parent {\n  color: red;\n\n  &:hover {\n    color: blue;\n  }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatPreserve_SingleLineExceedsPrintWidth(t *testing.T) {
+	// Single-line source that exceeds print-width → expands
+	src := []byte(`.foo{color:red;background:blue;}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		Mode:         FormatPreserve,
+		PrintWidth:   20,
+	})
+	expected := ".foo {\n  color: red;\n  background: blue;\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
 	}
 }

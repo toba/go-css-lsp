@@ -1,10 +1,11 @@
 ---
 # gocssofi8
 title: Add FormatDetect mode + blank line handling for compact/preserve/detect
-status: in-progress
+status: completed
 type: feature
+priority: normal
 created_at: 2026-02-01T23:02:54Z
-updated_at: 2026-02-01T23:02:54Z
+updated_at: 2026-02-01T23:05:08Z
 ---
 
 ## Overview
