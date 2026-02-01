@@ -1,0 +1,72 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - dupl
+    - errcheck
+    - errname
+    - errorlint # error wrapping best practices
+    - fatcontext
+    - gocheckcompilerdirectives
+    - gocritic # opinionated but useful
+    - godoclint
+    - gosec
+    - govet
+    - importas
+    - ineffassign
+    - intrange
+    - misspell # spelling mistakes
+    - modernize # use modern Go idioms (slices.Contains, etc)
+    - nilerr # returning nil after checking err != nil
+    - noctx
+    - perfsprint
+    - prealloc
+    - predeclared
+    - staticcheck
+    - testifylint
+    - unconvert # unnecessary type conversions
+    - unparam # unused function parameters
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace # leading/trailing whitespace
+  settings:
+    gocritic:
+      enabled-checks:
+        - sqlQuery
+        - boolExprSimplify
+        - deferUnlambda
+        - emptyFallthrough
+        - emptyStringTest
+        - nestingReduce
+        - paramTypeCombine
+        - ptrToRefParam
+        - stringConcatSimplify
+        - typeUnparen
+        - appendCombine
+        - hugeParam
+        - preferFprint
+        - preferStringWriter
+        - rangeExprCopy
+        - sliceClear
+      disabled-checks:
+        - ifElseChain
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+    - golines
+
+  settings:
+    golines: # https://golangci-lint.run/docs/formatters/configuration/#golines
+      max-len: 90
+      shorten-comments: false
+
+output:
+  sort-order:
+    - file
+    - linter

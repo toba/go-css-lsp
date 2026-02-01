@@ -1,0 +1,11 @@
+[
+  {
+    "label": "Claude Code",
+    "command": "open",
+    "args": ["-a", "Ghostty", "--args", "-e", "claude"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "never",
+    "hide": "on_success"
+  }
+]

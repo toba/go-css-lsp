@@ -1,0 +1,9 @@
+# Dev tool version management via mise (https://mise.jdx.dev/)
+# Run `mise install` to install all tools
+# Run `mise use <tool>@<version>` to update a tool version
+
+[tools]
+go = "1.25"
+"github:hmans/beans" = "latest"
+"github:STR-Consulting/bean-me-up" = "latest"
+golangci-lint = "2.8"

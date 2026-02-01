@@ -1,0 +1,49 @@
+{
+	"$schema": "https://json.schemastore.org/claude-code-settings.json",
+	"cleanupPeriodDays": 99999,
+	"env": {
+		"DISABLE_BUG_COMMAND": "1",
+		"DISABLE_ERROR_REPORTING": "1",
+		"DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+		"DISABLE_TELEMETRY": "1"
+	},
+	"includeCoAuthoredBy": false,
+	"permissions": {
+		"allow": [
+			"Bash(go:*)",
+			"Bash(golangci-lint:*)",
+			"Bash(git:*)",
+			"Bash(ls:*)",
+			"Bash(cat:*)",
+			"Bash(head:*)",
+			"Bash(tail:*)",
+			"Bash(grep:*)",
+			"Bash(find:*)",
+			"Bash(mise:*)",
+			"Skill(skill-creator)"
+		],
+		"deny": [
+			"Bash(git reset --hard:*)",
+			"Bash(npm i --global:*)",
+			"Bash(npm i -g:*)",
+			"Bash(npm install --global:*)",
+			"Bash(npm install -g:*)",
+			"Bash(npm run dev:*)",
+			"Bash(npm run serve:*)",
+			"Bash(npm run start &)",
+			"Bash(npm run start:*)",
+			"Bash(npx:*)",
+			"Bash(op)",
+			"Bash(op:*)",
+			"Bash(pip:*)",
+			"Bash(pip3:*)",
+			"Bash(open:*)"
+		]
+	},
+	"sandbox": {
+		"enabled": false,
+		"autoAllowBashIfSandboxed": true
+	},
+	"spinnerTipsEnabled": false,
+	"alwaysThinkingEnabled": true
+}

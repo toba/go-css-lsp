@@ -1,0 +1,114 @@
+// Package data provides CSS property, at-rule, pseudo-class,
+// and pseudo-element definitions as compiled Go literals.
+package data
+
+// Property describes a CSS property.
+type Property struct {
+	Name        string
+	Description string
+	MDN         string
+	Values      []string // common value keywords
+}
+
+// AtRuleDef describes a CSS at-rule.
+type AtRuleDef struct {
+	Name        string
+	Description string
+}
+
+// PseudoClass describes a CSS pseudo-class.
+type PseudoClass struct {
+	Name        string
+	Description string
+}
+
+// PseudoElement describes a CSS pseudo-element.
+type PseudoElement struct {
+	Name        string
+	Description string
+}
+
+// LookupProperty returns the property definition or nil.
+func LookupProperty(name string) *Property {
+	p, ok := propertyMap[name]
+	if !ok {
+		return nil
+	}
+	return &p
+}
+
+// LookupAtRule returns the at-rule definition or nil.
+func LookupAtRule(name string) *AtRuleDef {
+	a, ok := atRuleMap[name]
+	if !ok {
+		return nil
+	}
+	return &a
+}
+
+// LookupPseudoClass returns the pseudo-class definition or nil.
+func LookupPseudoClass(name string) *PseudoClass {
+	p, ok := pseudoClassMap[name]
+	if !ok {
+		return nil
+	}
+	return &p
+}
+
+// LookupPseudoElement returns the pseudo-element definition or
+// nil.
+func LookupPseudoElement(name string) *PseudoElement {
+	p, ok := pseudoElementMap[name]
+	if !ok {
+		return nil
+	}
+	return &p
+}
+
+// AllProperties returns all known property definitions.
+func AllProperties() []Property {
+	return Properties
+}
+
+// AllAtRules returns all known at-rule definitions.
+func AllAtRules() []AtRuleDef {
+	return AtRules
+}
+
+// AllPseudoClasses returns all known pseudo-class definitions.
+func AllPseudoClasses() []PseudoClass {
+	return PseudoClasses
+}
+
+// AllPseudoElements returns all known pseudo-element
+// definitions.
+func AllPseudoElements() []PseudoElement {
+	return PseudoElements
+}
+
+// IsKnownProperty returns whether the name is a known CSS
+// property.
+func IsKnownProperty(name string) bool {
+	_, ok := propertyMap[name]
+	return ok
+}
+
+// IsKnownAtRule returns whether the name is a known at-rule.
+func IsKnownAtRule(name string) bool {
+	_, ok := atRuleMap[name]
+	return ok
+}
+
+// IsKnownPseudoClass returns whether the name is a known
+// pseudo-class.
+func IsKnownPseudoClass(name string) bool {
+	_, ok := pseudoClassMap[name]
+	return ok
+}
+
+// IsKnownPseudoElement returns whether the name is a known
+// pseudo-element.
+func IsKnownPseudoElement(name string) bool {
+	_, ok := pseudoElementMap[name]
+	return ok
+}

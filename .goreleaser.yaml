@@ -1,0 +1,41 @@
+version: 2
+
+builds:
+  - id: go-css-lsp
+    main: ./cmd/go-css-lsp
+    binary: go-css-lsp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+
+archives:
+  - id: go-css-lsp
+    builds:
+      - go-css-lsp
+    formats:
+      - tar.gz
+    name_template: "go-css-lsp_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
