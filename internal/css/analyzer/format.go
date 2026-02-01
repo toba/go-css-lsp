@@ -273,6 +273,7 @@ func (f *formatter) writeValueMultiLine(
 	f.writeIndent()
 
 	prevEnd := -1
+	prevKind := scanner.EOF
 	afterBreak := true
 	for i, tok := range v.Tokens {
 		if tok.Kind == scanner.Whitespace {
@@ -284,11 +285,14 @@ func (f *formatter) writeValueMultiLine(
 			f.buf.WriteByte('\n')
 			f.writeIndent()
 			prevEnd = tok.End
+			prevKind = tok.Kind
 			afterBreak = true
 			continue
 		}
 		if !afterBreak && prevEnd >= 0 && tok.Offset > prevEnd {
-			if tok.Kind != scanner.ParenClose {
+			if tok.Kind != scanner.ParenClose &&
+				prevKind != scanner.Function &&
+				prevKind != scanner.ParenOpen {
 				f.buf.WriteByte(' ')
 			}
 		}
@@ -297,6 +301,7 @@ func (f *formatter) writeValueMultiLine(
 			string(f.src[tok.Offset:tok.End]),
 		)
 		prevEnd = tok.End
+		prevKind = tok.Kind
 	}
 
 	f.indent--
@@ -304,14 +309,15 @@ func (f *formatter) writeValueMultiLine(
 
 func (f *formatter) writeValue(v *parser.Value) {
 	prevEnd := -1
+	prevKind := scanner.EOF
 	for _, tok := range v.Tokens {
 		if tok.Kind == scanner.Whitespace {
 			continue
 		}
-		// Add space between non-adjacent tokens
 		if prevEnd >= 0 && tok.Offset > prevEnd {
-			// Don't add space after ( or before )
-			if tok.Kind != scanner.ParenClose {
+			if tok.Kind != scanner.ParenClose &&
+				prevKind != scanner.Function &&
+				prevKind != scanner.ParenOpen {
 				f.buf.WriteByte(' ')
 			}
 		}
@@ -319,6 +325,7 @@ func (f *formatter) writeValue(v *parser.Value) {
 			string(f.src[tok.Offset:tok.End]),
 		)
 		prevEnd = tok.End
+		prevKind = tok.Kind
 	}
 }
 
@@ -471,12 +478,15 @@ func (f *formatter) writeValueTo(
 	v *parser.Value,
 ) {
 	prevEnd := -1
+	prevKind := scanner.EOF
 	for _, tok := range v.Tokens {
 		if tok.Kind == scanner.Whitespace {
 			continue
 		}
 		if prevEnd >= 0 && tok.Offset > prevEnd {
-			if tok.Kind != scanner.ParenClose {
+			if tok.Kind != scanner.ParenClose &&
+				prevKind != scanner.Function &&
+				prevKind != scanner.ParenOpen {
 				sb.WriteByte(' ')
 			}
 		}
@@ -484,6 +494,7 @@ func (f *formatter) writeValueTo(
 			string(f.src[tok.Offset:tok.End]),
 		)
 		prevEnd = tok.End
+		prevKind = tok.Kind
 	}
 }
 

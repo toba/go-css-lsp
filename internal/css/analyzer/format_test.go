@@ -487,6 +487,36 @@ func TestFormatCompact_LongValueWraps(t *testing.T) {
 	}
 }
 
+func TestFormat_NoSpaceAfterFunctionParen(t *testing.T) {
+	// Source has whitespace after ( — formatter must not preserve it
+	src := []byte(`.foo { background: conic-gradient( from var( --angle), red, blue); }`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+
+	expected := `.foo {
+  background: conic-gradient(from var(--angle), red, blue);
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormatCompact_NoSpaceAfterFunctionParen(t *testing.T) {
+	// Source has whitespace after ( — formatter must not preserve it
+	src := []byte(`.foo { color: rgb( 255, 0, 0); }`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, compactOpts(80))
+	expected := ".foo { color: rgb(255, 0, 0); }\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
 func TestFormatPreserve_NestedFallsBackToExpanded(t *testing.T) {
 	src := []byte(`.parent { color: red; .child { font-size: 14px; } }`)
 	ss, _ := parser.Parse(src)
