@@ -105,13 +105,9 @@ func Rename(
 func FormatDocument(
 	ss *parser.Stylesheet,
 	src []byte,
-	tabSize int,
-	insertSpaces bool,
+	opts analyzer.FormatOptions,
 ) string {
-	return analyzer.Format(ss, src, analyzer.FormatOptions{
-		TabSize:      tabSize,
-		InsertSpaces: insertSpaces,
-	})
+	return analyzer.Format(ss, src, opts)
 }
 
 // FoldingRanges returns foldable ranges in the CSS document.

@@ -65,6 +65,13 @@ type NotificationMessage[T any] struct {
 	Params  T      `json:"params"`
 }
 
+// ServerSettings holds server-specific configuration from
+// initializationOptions.
+type ServerSettings struct {
+	FormatMode string `json:"formatMode"`
+	PrintWidth int    `json:"printWidth"`
+}
+
 // InitializeParams holds parameters for initialize request.
 type InitializeParams struct {
 	ProcessId    int            `json:"processId"`
@@ -73,10 +80,11 @@ type InitializeParams struct {
 		Name    string `json:"name"`
 		Version string `json:"version"`
 	} `json:"clientInfo"`
-	Locale           string `json:"locale"`
-	RootUri          string `json:"rootUri"`
-	Trace            any    `json:"trace"`
-	WorkspaceFolders any    `json:"workspaceFolders"`
+	Locale                string          `json:"locale"`
+	RootUri               string          `json:"rootUri"`
+	Trace                 any             `json:"trace"`
+	WorkspaceFolders      any             `json:"workspaceFolders"`
+	InitializationOptions *ServerSettings `json:"initializationOptions,omitempty"`
 }
 
 // ServerCapabilities describes this server's capabilities.
@@ -181,7 +189,7 @@ type CompletionList struct {
 func ProcessInitializeRequest(
 	data []byte,
 	lspName, lspVersion string,
-) (response []byte, root string) {
+) (response []byte, root string, settings *ServerSettings) {
 	req := RequestMessage[InitializeParams]{}
 
 	err := json.Unmarshal(data, &req)
@@ -235,7 +243,7 @@ func ProcessInitializeRequest(
 		panic(msg)
 	}
 
-	return response, req.Params.RootUri
+	return response, req.Params.RootUri, req.Params.InitializationOptions
 }
 
 // ProcessInitializedNotification handles the initialized

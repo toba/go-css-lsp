@@ -1,16 +1,33 @@
 package analyzer
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/toba/go-css-lsp/internal/css/parser"
 	"github.com/toba/go-css-lsp/internal/css/scanner"
 )
 
+// FormatMode controls how rulesets are laid out.
+type FormatMode int
+
+const (
+	// FormatExpanded puts one declaration per line (default).
+	FormatExpanded FormatMode = iota
+	// FormatCompact puts rulesets on a single line when they
+	// fit within PrintWidth.
+	FormatCompact
+	// FormatPreserve keeps original single/multi-line layout
+	// and normalizes whitespace only.
+	FormatPreserve
+)
+
 // FormatOptions controls CSS formatting behavior.
 type FormatOptions struct {
 	TabSize      int
 	InsertSpaces bool
+	Mode         FormatMode
+	PrintWidth   int
 }
 
 // Format formats the CSS document and returns the formatted
@@ -26,6 +43,9 @@ func Format(
 
 	if opts.TabSize == 0 {
 		opts.TabSize = 2
+	}
+	if opts.PrintWidth == 0 {
+		opts.PrintWidth = 80
 	}
 
 	f := &formatter{
@@ -65,7 +85,7 @@ func (f *formatter) formatStylesheet(ss *parser.Stylesheet) {
 
 		switch n := child.(type) {
 		case *parser.Ruleset:
-			f.formatRuleset(n)
+			f.dispatchRuleset(n)
 		case *parser.AtRule:
 			f.formatAtRule(n)
 		case *parser.Comment:
@@ -79,6 +99,18 @@ func (f *formatter) formatStylesheet(ss *parser.Stylesheet) {
 		if s[len(s)-1] != '\n' {
 			f.buf.WriteByte('\n')
 		}
+	}
+}
+
+// dispatchRuleset formats a ruleset using the configured mode.
+func (f *formatter) dispatchRuleset(rs *parser.Ruleset) {
+	switch f.opts.Mode {
+	case FormatCompact:
+		f.formatRulesetCompact(rs)
+	case FormatPreserve:
+		f.formatRulesetPreserve(rs)
+	default:
+		f.formatRuleset(rs)
 	}
 }
 
@@ -201,7 +233,7 @@ func (f *formatter) formatAtRule(ar *parser.AtRule) {
 			}
 			switch n := child.(type) {
 			case *parser.Ruleset:
-				f.formatRuleset(n)
+				f.dispatchRuleset(n)
 			case *parser.AtRule:
 				f.formatAtRule(n)
 			case *parser.Comment:
@@ -222,4 +254,174 @@ func (f *formatter) formatComment(c *parser.Comment) {
 		string(f.src[c.StartPos:c.EndPos]),
 	)
 	f.buf.WriteByte('\n')
+}
+
+// indentWidth returns the character width of the current
+// indent level.
+func (f *formatter) indentWidth() int {
+	if f.opts.InsertSpaces {
+		return f.indent * f.opts.TabSize
+	}
+	return f.indent
+}
+
+// buildSingleLine renders a ruleset as a single-line string:
+// "selector { decl; decl; }" or "selector {}" if empty.
+// It does not include a trailing newline.
+func (f *formatter) buildSingleLine(
+	rs *parser.Ruleset,
+) string {
+	var sb strings.Builder
+
+	if rs.Selectors != nil {
+		f.writeSelectorTo(&sb, rs.Selectors)
+	}
+
+	if len(rs.Declarations) == 0 {
+		sb.WriteString(" {}")
+		return sb.String()
+	}
+
+	sb.WriteString(" { ")
+	for i, decl := range rs.Declarations {
+		if i > 0 {
+			sb.WriteByte(' ')
+		}
+		sb.WriteString(decl.Property.Value)
+		sb.WriteString(": ")
+		if decl.Value != nil {
+			f.writeValueTo(&sb, decl.Value)
+		}
+		if decl.Important {
+			sb.WriteString(" !important")
+		}
+		sb.WriteByte(';')
+	}
+	sb.WriteString(" }")
+	return sb.String()
+}
+
+// writeSelectorTo writes the selector list to a builder,
+// separating multiple selectors with ", ".
+func (f *formatter) writeSelectorTo(
+	sb *strings.Builder,
+	sl *parser.SelectorList,
+) {
+	for i, sel := range sl.Selectors {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		f.writeSingleSelectorTo(sb, sel)
+	}
+}
+
+// writeSingleSelectorTo writes a single selector to a builder.
+func (f *formatter) writeSingleSelectorTo(
+	sb *strings.Builder,
+	sel *parser.Selector,
+) {
+	for i, part := range sel.Parts {
+		if part.Combinator != "" && part.Combinator != " " {
+			sb.WriteByte(' ')
+			sb.WriteString(part.Combinator)
+			sb.WriteByte(' ')
+		} else if i > 0 && part.Combinator == " " {
+			sb.WriteByte(' ')
+		}
+
+		if part.Token.Kind != scanner.EOF {
+			sb.WriteString(
+				string(f.src[part.Token.Offset:part.Token.End]),
+			)
+		}
+	}
+}
+
+// writeValueTo writes a value to a string builder.
+func (f *formatter) writeValueTo(
+	sb *strings.Builder,
+	v *parser.Value,
+) {
+	prevEnd := -1
+	for _, tok := range v.Tokens {
+		if tok.Kind == scanner.Whitespace {
+			continue
+		}
+		if prevEnd >= 0 && tok.Offset > prevEnd {
+			if tok.Kind != scanner.ParenClose {
+				sb.WriteByte(' ')
+			}
+		}
+		sb.WriteString(
+			string(f.src[tok.Offset:tok.End]),
+		)
+		prevEnd = tok.End
+	}
+}
+
+// rulesetHasCommentInSource checks whether the source bytes
+// between the opening brace and closing brace of a ruleset
+// contain a CSS comment.
+func (f *formatter) rulesetHasCommentInSource(
+	rs *parser.Ruleset,
+) bool {
+	return bytes.Contains(
+		f.src[rs.StartPos:rs.EndPos], []byte("/*"),
+	)
+}
+
+// formatRulesetCompact tries to render the ruleset on a single
+// line. Falls back to expanded if it doesn't fit within
+// printWidth or if the ruleset contains comments.
+func (f *formatter) formatRulesetCompact(
+	rs *parser.Ruleset,
+) {
+	if f.rulesetHasCommentInSource(rs) {
+		f.formatRuleset(rs)
+		return
+	}
+
+	line := f.buildSingleLine(rs)
+	totalWidth := f.indentWidth() + len(line)
+
+	if totalWidth <= f.opts.PrintWidth {
+		f.writeIndent()
+		f.buf.WriteString(line)
+		f.buf.WriteByte('\n')
+		return
+	}
+
+	f.formatRuleset(rs)
+}
+
+// isOriginalSingleLine checks whether the source between
+// startPos and endPos contains no newline characters.
+func (f *formatter) isOriginalSingleLine(
+	startPos, endPos int,
+) bool {
+	if startPos < 0 {
+		startPos = 0
+	}
+	if endPos > len(f.src) {
+		endPos = len(f.src)
+	}
+	return !bytes.ContainsRune(
+		f.src[startPos:endPos], '\n',
+	)
+}
+
+// formatRulesetPreserve keeps the original single-line vs
+// multi-line structure, normalizing whitespace only.
+func (f *formatter) formatRulesetPreserve(
+	rs *parser.Ruleset,
+) {
+	if f.isOriginalSingleLine(rs.StartPos, rs.EndPos) {
+		line := f.buildSingleLine(rs)
+		f.writeIndent()
+		f.buf.WriteString(line)
+		f.buf.WriteByte('\n')
+		return
+	}
+
+	f.formatRuleset(rs)
 }

@@ -30,6 +30,7 @@ type workspaceStore struct {
 	RawFiles    map[string][]byte
 	ParsedFiles map[string]*parser.Stylesheet
 	VarIndex    *workspace.Index
+	Settings    *lsp.ServerSettings
 }
 
 const serverName = "go-css-lsp"
@@ -122,9 +123,11 @@ func main() {
 		switch request.Method {
 		case lsp.MethodInitialize:
 			var rootURI string
-			response, rootURI = lsp.ProcessInitializeRequest(
+			var settings *lsp.ServerSettings
+			response, rootURI, settings = lsp.ProcessInitializeRequest(
 				data, serverName, version,
 			)
+			storage.Settings = settings
 			notifyTheRootPath(
 				rootPathNotification, rootURI,
 			)
@@ -774,11 +777,21 @@ func processFormatting(
 		ss = result.Stylesheet
 	}
 
-	formatted := css.FormatDocument(
-		ss, src,
-		req.Params.Options.TabSize,
-		req.Params.Options.InsertSpaces,
-	)
+	fmtOpts := analyzer.FormatOptions{
+		TabSize:      req.Params.Options.TabSize,
+		InsertSpaces: req.Params.Options.InsertSpaces,
+	}
+	if storage.Settings != nil {
+		switch storage.Settings.FormatMode {
+		case "compact":
+			fmtOpts.Mode = analyzer.FormatCompact
+		case "preserve":
+			fmtOpts.Mode = analyzer.FormatPreserve
+		}
+		fmtOpts.PrintWidth = storage.Settings.PrintWidth
+	}
+
+	formatted := css.FormatDocument(ss, src, fmtOpts)
 
 	result := []lsp.TextEdit{
 		{
