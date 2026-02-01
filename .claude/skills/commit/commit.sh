@@ -85,6 +85,31 @@ if [ "$PUSH" = "true" ]; then
         echo "==> Pushing tag (GoReleaser will create release)..."
         git push origin "$NEW_VERSION"
         echo "==> Tag $NEW_VERSION pushed, GoReleaser workflow will create release"
+
+        # Update Zed extension version (gossamer is sibling repo)
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        GOSSAMER_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)/../gossamer"
+        GOSSAMER_EXT_TOML="$GOSSAMER_DIR/extension.toml"
+        GOSSAMER_CARGO_TOML="$GOSSAMER_DIR/Cargo.toml"
+        if [ -f "$GOSSAMER_EXT_TOML" ]; then
+            # Strip 'v' prefix for toml files (uses 0.6.4 not v0.6.4)
+            EXT_VERSION=$(echo "$NEW_VERSION" | sed 's/^v//')
+            echo ""
+            echo "==> Updating gossamer to $EXT_VERSION..."
+            sed -i '' "s/^version = \".*\"/version = \"$EXT_VERSION\"/" "$GOSSAMER_EXT_TOML"
+            sed -i '' "s/^version = \".*\"/version = \"$EXT_VERSION\"/" "$GOSSAMER_CARGO_TOML"
+
+            # Commit and push the extension update
+            (
+                cd "$GOSSAMER_DIR"
+                git add extension.toml Cargo.toml
+                git commit -m "bump version to $EXT_VERSION"
+                git push
+                echo "==> gossamer updated and pushed"
+            )
+        else
+            echo "==> gossamer extension.toml not found at $GOSSAMER_EXT_TOML, skipping"
+        fi
     else
         echo "==> No existing tags, skipping version bump"
     fi

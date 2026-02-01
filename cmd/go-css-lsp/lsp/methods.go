@@ -89,20 +89,25 @@ type InitializeParams struct {
 
 // ServerCapabilities describes this server's capabilities.
 type ServerCapabilities struct {
-	TextDocumentSync           int                `json:"textDocumentSync"`
-	HoverProvider              bool               `json:"hoverProvider"`
-	CompletionProvider         *CompletionOptions `json:"completionProvider,omitempty"`
-	ColorProvider              bool               `json:"colorProvider,omitempty"`
-	DocumentSymbolProvider     bool               `json:"documentSymbolProvider,omitempty"`
-	DefinitionProvider         bool               `json:"definitionProvider,omitempty"`
-	ReferencesProvider         bool               `json:"referencesProvider,omitempty"`
-	CodeActionProvider         bool               `json:"codeActionProvider,omitempty"`
-	DocumentHighlightProvider  bool               `json:"documentHighlightProvider,omitempty"`
-	FoldingRangeProvider       bool               `json:"foldingRangeProvider,omitempty"`
-	DocumentLinkProvider       bool               `json:"documentLinkProvider,omitempty"`
-	DocumentFormattingProvider bool               `json:"documentFormattingProvider,omitempty"`
-	SelectionRangeProvider     bool               `json:"selectionRangeProvider,omitempty"`
-	RenameProvider             *RenameOptions     `json:"renameProvider,omitempty"`
+	TextDocumentSync           int                  `json:"textDocumentSync"`
+	HoverProvider              bool                 `json:"hoverProvider"`
+	CompletionProvider         *CompletionOptions   `json:"completionProvider,omitempty"`
+	ColorProvider              bool                 `json:"colorProvider,omitempty"`
+	DocumentSymbolProvider     bool                 `json:"documentSymbolProvider,omitempty"`
+	DefinitionProvider         bool                 `json:"definitionProvider,omitempty"`
+	ReferencesProvider         bool                 `json:"referencesProvider,omitempty"`
+	CodeActionProvider         bool                 `json:"codeActionProvider,omitempty"`
+	DocumentHighlightProvider  bool                 `json:"documentHighlightProvider,omitempty"`
+	FoldingRangeProvider       bool                 `json:"foldingRangeProvider,omitempty"`
+	DocumentLinkProvider       *DocumentLinkOptions `json:"documentLinkProvider,omitempty"`
+	DocumentFormattingProvider bool                 `json:"documentFormattingProvider,omitempty"`
+	SelectionRangeProvider     bool                 `json:"selectionRangeProvider,omitempty"`
+	RenameProvider             *RenameOptions       `json:"renameProvider,omitempty"`
+}
+
+// DocumentLinkOptions describes document link provider capabilities.
+type DocumentLinkOptions struct {
+	ResolveProvider bool `json:"resolveProvider,omitempty"`
 }
 
 // CompletionOptions describes completion provider capabilities.
@@ -217,7 +222,7 @@ func ProcessInitializeRequest(
 				CodeActionProvider:         true,
 				DocumentHighlightProvider:  true,
 				FoldingRangeProvider:       true,
-				DocumentLinkProvider:       true,
+				DocumentLinkProvider:       &DocumentLinkOptions{},
 				DocumentFormattingProvider: true,
 				SelectionRangeProvider:     true,
 				RenameProvider: &RenameOptions{
