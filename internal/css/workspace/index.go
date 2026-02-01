@@ -36,6 +36,7 @@ type VariableDefinition struct {
 	URI      string
 	StartPos int
 	EndPos   int
+	RawValue string // e.g. "#ff0000", "rgb(0, 0, 0)"
 }
 
 // Index maintains a workspace-wide index of CSS custom
@@ -95,14 +96,17 @@ func (idx *Index) IndexFile(uri string, src []byte) {
 	if ss == nil {
 		return
 	}
-	idx.IndexFileWithStylesheet(uri, ss)
+	idx.IndexFileWithStylesheet(uri, ss, src)
 }
 
 // IndexFileWithStylesheet indexes a file's custom properties
 // using a pre-parsed stylesheet, avoiding a redundant parse.
+// The src parameter is used to extract raw values for custom
+// property definitions; it may be nil if unavailable.
 func (idx *Index) IndexFileWithStylesheet(
 	uri string,
 	ss *parser.Stylesheet,
+	src []byte,
 ) {
 	if ss == nil {
 		return
@@ -122,11 +126,19 @@ func (idx *Index) IndexFileWithStylesheet(
 			return true
 		}
 
+		var rawValue string
+		if decl.Value != nil && src != nil {
+			rawValue = strings.TrimSpace(
+				string(src[decl.Value.StartPos:decl.Value.EndPos]),
+			)
+		}
+
 		defs = append(defs, VariableDefinition{
 			Name:     name,
 			URI:      uri,
 			StartPos: decl.Property.Offset,
 			EndPos:   decl.Property.End,
+			RawValue: rawValue,
 		})
 		names = append(names, name)
 
@@ -189,6 +201,20 @@ func (idx *Index) LookupDefinitions(
 	result := make([]VariableDefinition, len(defs))
 	copy(result, defs)
 	return result
+}
+
+// ResolveVariable returns the raw value of a custom property.
+// It uses the first definition found (no cascade resolution).
+func (idx *Index) ResolveVariable(
+	name string,
+) (string, bool) {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	defs := idx.definitions[name]
+	if len(defs) == 0 {
+		return "", false
+	}
+	return defs[0].RawValue, defs[0].RawValue != ""
 }
 
 // AllVariableNames returns all known custom property names.

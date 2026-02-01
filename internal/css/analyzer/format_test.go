@@ -582,6 +582,39 @@ func TestFormatDetect_InlineExceedsPrintWidth(t *testing.T) {
 	}
 }
 
+func TestFormatDetect_MultiSelectorInlineFits(t *testing.T) {
+	// Multi-selector with first prop inline → single line
+	src := []byte(`ul, ol { margin: 0; }`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := "ul, ol { margin: 0; }\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_MultiSelectorNewLine(t *testing.T) {
+	// Multi-selector with first prop on new line → expanded
+	src := []byte("ul, ol {\n  margin: 0;\n}")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := "ul,\nol {\n  margin: 0;\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_MultiSelectorInlineExceedsPrintWidth(t *testing.T) {
+	// Multi-selector inline but exceeds print-width → falls back to expanded
+	src := []byte(`ul, ol { margin: 0; }`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(15))
+	expected := "ul,\nol {\n  margin: 0;\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
 // --- Blank line handling tests ---
 
 func TestFormatCompact_NoBlankLinesBetweenTopLevelRules(t *testing.T) {

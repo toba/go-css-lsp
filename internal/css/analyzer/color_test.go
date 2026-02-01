@@ -484,6 +484,126 @@ func TestParseHexColor(t *testing.T) {
 	}
 }
 
+// mockResolver implements VariableResolver for testing.
+type mockResolver struct {
+	vars map[string]string
+}
+
+func (m *mockResolver) ResolveVariable(
+	name string,
+) (string, bool) {
+	v, ok := m.vars[name]
+	return v, ok
+}
+
+func TestFindDocumentColorsWithVar(t *testing.T) {
+	src := []byte(`.foo { color: var(--primary); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--primary": "#ff0000",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 1.0)
+}
+
+func TestFindDocumentColorsVarUnknown(t *testing.T) {
+	src := []byte(`.foo { color: var(--unknown); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 0 {
+		t.Fatalf("expected 0 colors, got %d", len(colors))
+	}
+}
+
+func TestFindDocumentColorsVarNonColor(t *testing.T) {
+	src := []byte(`.foo { margin: var(--spacing); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--spacing": "10px",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 0 {
+		t.Fatalf("expected 0 colors, got %d", len(colors))
+	}
+}
+
+func TestFindDocumentColorsVarNested(t *testing.T) {
+	// var() inside a variable value should not be recursively
+	// resolved (nil resolver on recursion).
+	src := []byte(`.foo { color: var(--alias); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--alias": "var(--real)",
+			"--real":  "#00ff00",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	// --alias resolves to "var(--real)" which contains a var()
+	// but since recursion uses nil resolver, no color found.
+	if len(colors) != 0 {
+		t.Fatalf("expected 0 colors, got %d", len(colors))
+	}
+}
+
+func TestFindDocumentColorsVarRGBValue(t *testing.T) {
+	src := []byte(`.foo { background: var(--bg); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--bg": "rgb(0, 255, 0)",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.0, 1.0, 0.0, 1.0)
+}
+
+func TestFindDocumentColorsVarNamedColor(t *testing.T) {
+	src := []byte(`.foo { color: var(--accent); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--accent": "blue",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.0, 0.0, 1.0, 1.0)
+}
+
+func TestFindDocumentColorsVarNilResolver(t *testing.T) {
+	// With nil resolver, var() should produce no colors (same
+	// as original behavior).
+	src := []byte(`.foo { color: var(--primary); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 0 {
+		t.Fatalf("expected 0 colors, got %d", len(colors))
+	}
+}
+
 func assertColorClose(
 	t *testing.T,
 	c Color,

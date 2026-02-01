@@ -26,11 +26,28 @@ type DocumentColor struct {
 	EndPos   int
 }
 
+// VariableResolver resolves CSS custom property names to their
+// raw value text.
+type VariableResolver interface {
+	ResolveVariable(name string) (rawValue string, ok bool)
+}
+
 // FindDocumentColors returns all colors found in the CSS
 // document.
 func FindDocumentColors(
 	ss *parser.Stylesheet,
 	src []byte,
+) []DocumentColor {
+	return FindDocumentColorsResolved(ss, src, nil)
+}
+
+// FindDocumentColorsResolved returns all colors found in the
+// CSS document, resolving var() references through the given
+// resolver.
+func FindDocumentColorsResolved(
+	ss *parser.Stylesheet,
+	src []byte,
+	resolver VariableResolver,
 ) []DocumentColor {
 	var colors []DocumentColor
 
@@ -44,7 +61,9 @@ func FindDocumentColors(
 		}
 		colors = append(
 			colors,
-			findColorsInTokens(decl.Value.Tokens, src)...,
+			findColorsInTokens(
+				decl.Value.Tokens, src, resolver,
+			)...,
 		)
 		return true
 	})
@@ -55,6 +74,7 @@ func FindDocumentColors(
 func findColorsInTokens(
 	tokens []scanner.Token,
 	src []byte,
+	resolver VariableResolver,
 ) []DocumentColor {
 	var colors []DocumentColor
 
@@ -91,11 +111,87 @@ func findColorsInTokens(
 				); ok {
 					colors = append(colors, dc)
 				}
+			case "var":
+				if resolver == nil {
+					continue
+				}
+				if dc, ok := resolveVarColor(
+					tokens[i:], resolver,
+				); ok {
+					colors = append(colors, dc)
+				}
 			}
 		}
 	}
 
 	return colors
+}
+
+// resolveVarColor attempts to resolve a var() call to a color
+// through the resolver. tokens[0] must be the var( function
+// token.
+func resolveVarColor(
+	tokens []scanner.Token,
+	resolver VariableResolver,
+) (DocumentColor, bool) {
+	if len(tokens) < 2 {
+		return DocumentColor{}, false
+	}
+
+	startPos := tokens[0].Offset
+	var endPos int
+	var varName string
+
+	// Find the variable name and closing paren
+	for j := 1; j < len(tokens); j++ {
+		tok := tokens[j]
+		if tok.Kind == scanner.Whitespace {
+			continue
+		}
+		if tok.Kind == scanner.ParenClose {
+			endPos = tok.End
+			break
+		}
+		if tok.Kind == scanner.Ident && varName == "" {
+			varName = tok.Value
+			continue
+		}
+		// Hit comma (fallback) or other token — find the
+		// closing paren for the span
+		if tok.Kind == scanner.Comma {
+			for k := j + 1; k < len(tokens); k++ {
+				if tokens[k].Kind == scanner.ParenClose {
+					endPos = tokens[k].End
+					goto resolve
+				}
+			}
+			return DocumentColor{}, false
+		}
+	}
+
+resolve:
+	if varName == "" || endPos == 0 {
+		return DocumentColor{}, false
+	}
+
+	rawValue, ok := resolver.ResolveVariable(varName)
+	if !ok {
+		return DocumentColor{}, false
+	}
+
+	// Scan the raw value as CSS tokens and look for a color.
+	// Pass nil resolver to prevent infinite recursion.
+	valTokens := scanner.ScanAll([]byte(rawValue))
+	resolved := findColorsInTokens(valTokens, []byte(rawValue), nil)
+	if len(resolved) == 0 {
+		return DocumentColor{}, false
+	}
+
+	return DocumentColor{
+		Color:    resolved[0].Color,
+		StartPos: startPos,
+		EndPos:   endPos,
+	}, true
 }
 
 // parseHexColor parses a hex color value (without the # prefix

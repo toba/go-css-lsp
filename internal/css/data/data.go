@@ -2,6 +2,8 @@
 // and pseudo-element definitions as compiled Go literals.
 package data
 
+//go:generate go run ../../../cmd/generate-data
+
 // Property describes a CSS property.
 type Property struct {
 	Name        string

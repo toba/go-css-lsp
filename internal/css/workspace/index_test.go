@@ -102,6 +102,115 @@ func TestIndex_ReindexFile(t *testing.T) {
 	}
 }
 
+func TestIndex_CrossFileDefinitionLookup(t *testing.T) {
+	idx := NewIndex()
+
+	// File A defines the variable
+	srcA := []byte(`:root { --color-surface: #fff; }`)
+	idx.IndexFile("file:///tokens.css", srcA)
+
+	// File B uses the variable but does not define it
+	srcB := []byte(`.card { background: var(--color-surface); }`)
+	idx.IndexFile("file:///card.css", srcB)
+
+	// Same-file lookup in card.css should find nothing
+	defs := idx.LookupDefinitions("--color-surface")
+	found := false
+	for _, d := range defs {
+		if d.URI == "file:///card.css" {
+			found = true
+		}
+	}
+	if found {
+		t.Error("card.css should not contain a definition")
+	}
+
+	// Workspace lookup should find the definition in tokens.css
+	if len(defs) != 1 {
+		t.Fatalf("expected 1 definition, got %d", len(defs))
+	}
+	if defs[0].URI != "file:///tokens.css" {
+		t.Errorf(
+			"expected tokens.css, got %s", defs[0].URI,
+		)
+	}
+
+	// Verify offsets point to the correct text
+	propText := string(
+		srcA[defs[0].StartPos:defs[0].EndPos],
+	)
+	if propText != "--color-surface" {
+		t.Errorf(
+			"expected --color-surface, got %q", propText,
+		)
+	}
+}
+
+func TestVariableDefinitionRawValue(t *testing.T) {
+	idx := NewIndex()
+
+	src := []byte(`:root {
+  --color: #ff0000;
+  --bg: rgb(0, 0, 0);
+  --size: 16px;
+}`)
+	idx.IndexFile("file:///test.css", src)
+
+	defs := idx.LookupDefinitions("--color")
+	if len(defs) != 1 {
+		t.Fatalf("expected 1 def, got %d", len(defs))
+	}
+	if defs[0].RawValue != "#ff0000" {
+		t.Errorf(
+			"expected RawValue #ff0000, got %q",
+			defs[0].RawValue,
+		)
+	}
+
+	defs = idx.LookupDefinitions("--bg")
+	if len(defs) != 1 {
+		t.Fatalf("expected 1 def, got %d", len(defs))
+	}
+	if defs[0].RawValue != "rgb(0, 0, 0)" {
+		t.Errorf(
+			"expected RawValue rgb(0, 0, 0), got %q",
+			defs[0].RawValue,
+		)
+	}
+
+	defs = idx.LookupDefinitions("--size")
+	if len(defs) != 1 {
+		t.Fatalf("expected 1 def, got %d", len(defs))
+	}
+	if defs[0].RawValue != "16px" {
+		t.Errorf(
+			"expected RawValue 16px, got %q",
+			defs[0].RawValue,
+		)
+	}
+}
+
+func TestResolveVariable(t *testing.T) {
+	idx := NewIndex()
+
+	idx.IndexFile("file:///test.css", []byte(
+		`:root { --primary: #ff0000; }`,
+	))
+
+	val, ok := idx.ResolveVariable("--primary")
+	if !ok {
+		t.Fatal("expected ResolveVariable to return ok")
+	}
+	if val != "#ff0000" {
+		t.Errorf("expected #ff0000, got %q", val)
+	}
+
+	_, ok = idx.ResolveVariable("--unknown")
+	if ok {
+		t.Error("expected ResolveVariable to return !ok for unknown")
+	}
+}
+
 func TestIndex_AllVariableNames(t *testing.T) {
 	idx := NewIndex()
 

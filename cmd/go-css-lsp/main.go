@@ -459,7 +459,9 @@ func processDocumentColor(
 		ss = result.Stylesheet
 	}
 
-	docColors := css.DocumentColors(ss, src)
+	docColors := css.DocumentColorsResolved(
+		ss, src, storage.VarIndex,
+	)
 	result := make([]lsp.ColorInformation, len(docColors))
 
 	for i, dc := range docColors {
@@ -1172,23 +1174,58 @@ func processDefinition(
 		int(req.Params.Position.Character), //nolint:gosec
 	)
 
-	if !found {
+	if found {
+		result := lsp.LSPLocation{
+			URI: uri,
+			Range: offsetRangeToLSPRange(
+				src, loc.StartPos, loc.EndPos,
+			),
+		}
+		return marshalDefinitionResult(
+			req.JsonRpc, req.Id, result,
+		)
+	}
+
+	// Fall back to workspace index for cross-file lookup
+	varName := css.VarReferenceAt(
+		ss, src,
+		int(req.Params.Position.Line),      //nolint:gosec
+		int(req.Params.Position.Character), //nolint:gosec
+	)
+	if varName == "" {
+		return marshalNullResult(req.JsonRpc, req.Id)
+	}
+
+	defs := storage.VarIndex.LookupDefinitions(varName)
+	if len(defs) == 0 {
+		return marshalNullResult(req.JsonRpc, req.Id)
+	}
+
+	def := defs[0]
+	targetSrc := storage.RawFiles[def.URI]
+	if targetSrc == nil {
 		return marshalNullResult(req.JsonRpc, req.Id)
 	}
 
 	result := lsp.LSPLocation{
-		URI: uri,
+		URI: def.URI,
 		Range: offsetRangeToLSPRange(
-			src, loc.StartPos, loc.EndPos,
+			targetSrc, def.StartPos, def.EndPos,
 		),
 	}
+	return marshalDefinitionResult(req.JsonRpc, req.Id, result)
+}
 
+func marshalDefinitionResult(
+	jsonRpc string,
+	id lsp.ID,
+	result lsp.LSPLocation,
+) []byte {
 	res := lsp.ResponseMessage[lsp.LSPLocation]{
-		JsonRpc: req.JsonRpc,
-		Id:      req.Id,
+		JsonRpc: jsonRpc,
+		Id:      id,
 		Result:  result,
 	}
-
 	out, err := json.Marshal(res)
 	if err != nil {
 		slog.Warn(
@@ -1411,7 +1448,7 @@ func processDiagnosticNotification(
 
 			// Update workspace variable index using
 			// pre-parsed stylesheet to avoid double-parse
-			storage.VarIndex.IndexFileWithStylesheet(uri, ss)
+			storage.VarIndex.IndexFileWithStylesheet(uri, ss, content)
 
 			notification.Params.Uri = uri
 			notification.Params.Diagnostics = convertDiagnostics(diags)

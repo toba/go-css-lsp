@@ -61,6 +61,18 @@ func DocumentColors(
 	return analyzer.FindDocumentColors(ss, src)
 }
 
+// DocumentColorsResolved returns all colors found in the CSS
+// document, resolving var() references through the resolver.
+func DocumentColorsResolved(
+	ss *parser.Stylesheet,
+	src []byte,
+	resolver analyzer.VariableResolver,
+) []analyzer.DocumentColor {
+	return analyzer.FindDocumentColorsResolved(
+		ss, src, resolver,
+	)
+}
+
 // ColorPresentations returns alternative representations of a
 // color.
 func ColorPresentations(
@@ -184,6 +196,17 @@ func Completions(
 ) []analyzer.CompletionItem {
 	offset := LineCharToOffset(src, line, char)
 	return analyzer.Complete(ss, src, offset)
+}
+
+// VarReferenceAt returns the CSS variable name at the given
+// position if it's a var() reference, or empty string.
+func VarReferenceAt(
+	ss *parser.Stylesheet,
+	src []byte,
+	line, char int,
+) string {
+	offset := LineCharToOffset(src, line, char)
+	return analyzer.FindVarReferenceAt(ss, src, offset)
 }
 
 // OffsetToLineChar converts a byte offset to line/character.
