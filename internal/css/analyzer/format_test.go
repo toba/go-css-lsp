@@ -379,6 +379,114 @@ func TestFormatCompact_NestedFallsBackToExpanded(t *testing.T) {
 	}
 }
 
+// --- Value wrapping tests ---
+
+func TestFormat_LongValueWrapsAtTopLevelCommas(t *testing.T) {
+	src := []byte(`.glow {
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    conic-gradient(from var(--glow-angle), transparent 40%, var(--brand-teal), transparent 60%) border-box;
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		PrintWidth:   120,
+	})
+
+	expected := `.glow {
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    conic-gradient(from var(--glow-angle), transparent 40%, var(--brand-teal), transparent 60%) border-box;
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormat_ShortValueStaysSingleLine(t *testing.T) {
+	src := []byte(`.foo { background: red, blue; }`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		PrintWidth:   80,
+	})
+
+	expected := `.foo {
+  background: red, blue;
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormat_LongValueNoTopLevelCommasStaysSingleLine(t *testing.T) {
+	// Value is long but all commas are inside function parens
+	src := []byte(`.foo { color: rgb(100, 200, 300); }`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		PrintWidth:   20,
+	})
+
+	expected := `.foo {
+  color: rgb(100, 200, 300);
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormat_LongValueWrapsWithImportant(t *testing.T) {
+	src := []byte(
+		`.foo { background: linear-gradient(red, blue) padding-box, conic-gradient(green, yellow) border-box !important; }`,
+	)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		PrintWidth:   40,
+	})
+
+	expected := `.foo {
+  background:
+    linear-gradient(red, blue) padding-box,
+    conic-gradient(green, yellow) border-box !important;
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormatCompact_LongValueWraps(t *testing.T) {
+	src := []byte(
+		`.foo { background: linear-gradient(red, blue) padding-box, conic-gradient(green, yellow) border-box; }`,
+	)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, compactOpts(40))
+
+	expected := `.foo {
+  background:
+    linear-gradient(red, blue) padding-box,
+    conic-gradient(green, yellow) border-box;
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
 func TestFormatPreserve_NestedFallsBackToExpanded(t *testing.T) {
 	src := []byte(`.parent { color: red; .child { font-size: 14px; } }`)
 	ss, _ := parser.Parse(src)

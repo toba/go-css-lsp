@@ -192,6 +192,32 @@ func (f *formatter) writeSingleSelector(sel *parser.Selector) {
 func (f *formatter) formatDeclaration(
 	decl *parser.Declaration,
 ) {
+	if decl.Value != nil {
+		// Measure the single-line length.
+		var tmp strings.Builder
+		f.writeValueTo(&tmp, decl.Value)
+		valStr := tmp.String()
+
+		lineLen := f.indentWidth() + len(decl.Property.Value) + 2 + len(valStr) + 1
+		if decl.Important {
+			lineLen += 11 // " !important"
+		}
+
+		commaIndices := f.topLevelCommaIndices(decl.Value)
+
+		if lineLen > f.opts.PrintWidth && len(commaIndices) > 0 {
+			f.writeIndent()
+			f.buf.WriteString(decl.Property.Value)
+			f.buf.WriteString(":\n")
+			f.writeValueMultiLine(decl.Value, commaIndices)
+			if decl.Important {
+				f.buf.WriteString(" !important")
+			}
+			f.buf.WriteString(";\n")
+			return
+		}
+	}
+
 	f.writeIndent()
 	f.buf.WriteString(decl.Property.Value)
 	f.buf.WriteString(": ")
@@ -205,6 +231,75 @@ func (f *formatter) formatDeclaration(
 	}
 
 	f.buf.WriteString(";\n")
+}
+
+// topLevelCommaIndices returns token indices of commas that
+// are not inside parentheses (depth 0).
+func (f *formatter) topLevelCommaIndices(
+	v *parser.Value,
+) []int {
+	var indices []int
+	depth := 0
+	for i, tok := range v.Tokens {
+		switch tok.Kind {
+		case scanner.Function, scanner.ParenOpen:
+			depth++
+		case scanner.ParenClose:
+			if depth > 0 {
+				depth--
+			}
+		case scanner.Comma:
+			if depth == 0 {
+				indices = append(indices, i)
+			}
+		}
+	}
+	return indices
+}
+
+// writeValueMultiLine writes a value across multiple lines,
+// breaking at each top-level comma. Each segment is indented
+// one level deeper than the current indent.
+func (f *formatter) writeValueMultiLine(
+	v *parser.Value,
+	commaIndices []int,
+) {
+	commaSet := make(map[int]bool, len(commaIndices))
+	for _, idx := range commaIndices {
+		commaSet[idx] = true
+	}
+
+	f.indent++
+	f.writeIndent()
+
+	prevEnd := -1
+	afterBreak := true
+	for i, tok := range v.Tokens {
+		if tok.Kind == scanner.Whitespace {
+			continue
+		}
+		if commaSet[i] {
+			// Write the comma, then newline + indent
+			f.buf.WriteByte(',')
+			f.buf.WriteByte('\n')
+			f.writeIndent()
+			prevEnd = tok.End
+			afterBreak = true
+			continue
+		}
+		if !afterBreak && prevEnd >= 0 && tok.Offset > prevEnd {
+			if tok.Kind != scanner.ParenClose {
+				f.buf.WriteByte(' ')
+			}
+		}
+		afterBreak = false
+		f.buf.WriteString(
+			string(f.src[tok.Offset:tok.End]),
+		)
+		prevEnd = tok.End
+	}
+
+	f.indent--
 }
 
 func (f *formatter) writeValue(v *parser.Value) {
