@@ -20,6 +20,8 @@ func Complete(
 	ctx := determineContext(ss, src, offset)
 
 	switch ctx.kind {
+	case contextNone:
+		return nil
 	case contextProperty:
 		return completeProperties(ctx.prefix)
 	case contextValue:
@@ -41,6 +43,7 @@ type contextKind int
 
 const (
 	contextUnknown contextKind = iota
+	contextNone
 	contextProperty
 	contextValue
 	contextAtRule
@@ -62,6 +65,11 @@ func determineContext(
 ) completionContext {
 	if offset > len(src) {
 		offset = len(src)
+	}
+
+	// No completions inside comments
+	if isInsideComment(src, offset) {
+		return completionContext{kind: contextNone}
 	}
 
 	// Look backwards from offset for context clues
@@ -399,4 +407,21 @@ func isBreakChar(ch byte) bool {
 	return ch == ':' || ch == ';' || ch == '{' ||
 		ch == '}' || ch == '(' || ch == ',' ||
 		ch == '\n'
+}
+
+// isInsideComment checks if offset is within a /* */ comment.
+func isInsideComment(src []byte, offset int) bool {
+	text := src[:offset]
+	// Find the last /* and check there's no */ after it
+	for i := len(text) - 1; i >= 1; i-- {
+		if text[i] == '/' && text[i-1] == '*' {
+			// Found a closing */, so we're not in a comment
+			return false
+		}
+		if text[i] == '*' && i >= 1 && text[i-1] == '/' {
+			// Found an opening /*, so we're in a comment
+			return true
+		}
+	}
+	return false
 }

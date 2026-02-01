@@ -164,15 +164,15 @@ func TestColorPresentation(t *testing.T) {
 	if presentations[0] != "#ff0000" {
 		t.Errorf("expected #ff0000, got %s", presentations[0])
 	}
-	if presentations[1] != "rgb(255, 0, 0)" {
+	if presentations[1] != "rgb(255 0 0)" {
 		t.Errorf(
-			"expected rgb(255, 0, 0), got %s",
+			"expected rgb(255 0 0), got %s",
 			presentations[1],
 		)
 	}
-	if presentations[2] != "hsl(0, 100%, 50%)" {
+	if presentations[2] != "hsl(0 100% 50%)" {
 		t.Errorf(
-			"expected hsl(0, 100%%, 50%%), got %s",
+			"expected hsl(0 100%% 50%%), got %s",
 			presentations[2],
 		)
 	}
@@ -191,6 +191,267 @@ func TestColorPresentation_WithAlpha(t *testing.T) {
 
 	if presentations[0] != "#ff000080" {
 		t.Errorf("expected #ff000080, got %s", presentations[0])
+	}
+	if presentations[1] != "rgb(255 0 0 / 50%)" {
+		t.Errorf(
+			"expected rgb(255 0 0 / 50%%), got %s",
+			presentations[1],
+		)
+	}
+	if presentations[2] != "hsl(0 100% 50% / 50%)" {
+		t.Errorf(
+			"expected hsl(0 100%% 50%% / 50%%), got %s",
+			presentations[2],
+		)
+	}
+}
+
+func TestFindDocumentColors_LabFunction(t *testing.T) {
+	src := []byte(`.foo { color: lab(50 40 -20); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	// lab(50 40 -20) should produce some color
+	c := colors[0].Color
+	if c.Alpha != 1.0 {
+		t.Errorf("expected alpha 1.0, got %f", c.Alpha)
+	}
+}
+
+func TestFindDocumentColors_LchFunction(t *testing.T) {
+	src := []byte(`.foo { color: lch(50 30 270); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	c := colors[0].Color
+	if c.Alpha != 1.0 {
+		t.Errorf("expected alpha 1.0, got %f", c.Alpha)
+	}
+}
+
+func TestFindDocumentColors_OklabFunction(t *testing.T) {
+	src := []byte(`.foo { color: oklab(0.5 0.1 -0.1); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	c := colors[0].Color
+	if c.Alpha != 1.0 {
+		t.Errorf("expected alpha 1.0, got %f", c.Alpha)
+	}
+}
+
+func TestFindDocumentColors_OklchFunction(t *testing.T) {
+	src := []byte(`.foo { color: oklch(0.5 0.15 270); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	c := colors[0].Color
+	if c.Alpha != 1.0 {
+		t.Errorf("expected alpha 1.0, got %f", c.Alpha)
+	}
+}
+
+func TestFindDocumentColors_LabWithAlpha(t *testing.T) {
+	src := []byte(`.foo { color: lab(50 40 -20 / 50%); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color,
+		colors[0].Color.Red,
+		colors[0].Color.Green,
+		colors[0].Color.Blue,
+		0.5,
+	)
+}
+
+func TestFindDocumentColors_OklchRed(t *testing.T) {
+	// oklch(0.6279 0.2577 29.23) ≈ red-ish
+	src := []byte(`.foo { color: oklch(0.6279 0.2577 29.23); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	c := colors[0].Color
+	// Should be reddish: R should be high
+	if c.Red < 0.5 {
+		t.Errorf("expected reddish color, got R=%.3f", c.Red)
+	}
+}
+
+func TestFindDocumentColors_OklabPercentL(t *testing.T) {
+	// oklab(50% 0.1 -0.1) — L as percentage
+	src := []byte(`.foo { color: oklab(50% 0.1 -0.1); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	c := colors[0].Color
+	if c.Alpha != 1.0 {
+		t.Errorf("expected alpha 1.0, got %f", c.Alpha)
+	}
+}
+
+func TestFindDocumentColors_OklchPercentL(t *testing.T) {
+	// oklch(50% 0.15 270) — L as percentage
+	src := []byte(`.foo { color: oklch(50% 0.15 270); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	c := colors[0].Color
+	if c.Alpha != 1.0 {
+		t.Errorf("expected alpha 1.0, got %f", c.Alpha)
+	}
+}
+
+func TestFindDocumentColors_LchWithAlpha(t *testing.T) {
+	src := []byte(`.foo { color: lch(50 30 270 / 75%); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color,
+		colors[0].Color.Red,
+		colors[0].Color.Green,
+		colors[0].Color.Blue,
+		0.75,
+	)
+}
+
+func TestFindDocumentColors_OklchWithAlpha(t *testing.T) {
+	src := []byte(`.foo { color: oklch(0.5 0.15 270 / 25%); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color,
+		colors[0].Color.Red,
+		colors[0].Color.Green,
+		colors[0].Color.Blue,
+		0.25,
+	)
+}
+
+func TestFindDocumentColors_LabBlack(t *testing.T) {
+	// lab(0 0 0) = black
+	src := []byte(`.foo { color: lab(0 0 0); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.0, 0.0, 0.0, 1.0)
+}
+
+func TestFindDocumentColors_LabWhite(t *testing.T) {
+	// lab(100 0 0) = white
+	src := []byte(`.foo { color: lab(100 0 0); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 1.0, 1.0, 1.0)
+}
+
+func TestFindDocumentColors_OklabBlack(t *testing.T) {
+	// oklab(0 0 0) = black
+	src := []byte(`.foo { color: oklab(0 0 0); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.0, 0.0, 0.0, 1.0)
+}
+
+func TestFindDocumentColors_OklabWhite(t *testing.T) {
+	// oklab(1 0 0) = white
+	src := []byte(`.foo { color: oklab(1 0 0); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 1.0, 1.0, 1.0)
+}
+
+func TestFindDocumentColors_HSLWithAlpha(t *testing.T) {
+	src := []byte(`.foo { color: hsl(0 100% 50% / 50%); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 0.5)
+}
+
+func TestFindDocumentColors_HWBWithAlpha(t *testing.T) {
+	src := []byte(`.foo { color: hwb(0 0% 0% / 50%); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 0.5)
+}
+
+func TestFindDocumentColors_RGBPercentage(t *testing.T) {
+	src := []byte(`.foo { color: rgb(100%, 0%, 0%); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 1.0)
+}
+
+func TestColorPresentation_Green(t *testing.T) {
+	c := Color{Red: 0.0, Green: 1.0, Blue: 0.0, Alpha: 1.0}
+	presentations := ColorPresentation(c)
+
+	if presentations[0] != "#00ff00" {
+		t.Errorf("expected #00ff00, got %s", presentations[0])
+	}
+	if presentations[1] != "rgb(0 255 0)" {
+		t.Errorf("expected rgb(0 255 0), got %s",
+			presentations[1])
+	}
+	if presentations[2] != "hsl(120 100% 50%)" {
+		t.Errorf("expected hsl(120 100%% 50%%), got %s",
+			presentations[2])
 	}
 }
 

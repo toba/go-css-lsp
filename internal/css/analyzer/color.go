@@ -81,19 +81,11 @@ func findColorsInTokens(
 		case scanner.Function:
 			name := strings.ToLower(tok.Value)
 			switch name {
-			case "rgb", "rgba":
-				if dc, ok := parseColorFunction(
-					name, tokens[i:], src,
-				); ok {
-					colors = append(colors, dc)
-				}
-			case "hsl", "hsla":
-				if dc, ok := parseColorFunction(
-					name, tokens[i:], src,
-				); ok {
-					colors = append(colors, dc)
-				}
-			case "hwb":
+			case "rgb", "rgba",
+				"hsl", "hsla",
+				"hwb",
+				"lab", "lch",
+				"oklab", "oklch":
 				if dc, ok := parseColorFunction(
 					name, tokens[i:], src,
 				); ok {
@@ -212,6 +204,7 @@ func parseColorFunction(
 	var isPercent []bool
 	hasSlash := false
 
+	negateNext := false
 	for j := 1; j < len(tokens); j++ {
 		tok := tokens[j]
 		switch tok.Kind {
@@ -223,6 +216,10 @@ func parseColorFunction(
 			if err != nil {
 				return DocumentColor{}, false
 			}
+			if negateNext {
+				v = -v
+				negateNext = false
+			}
 			args = append(args, v)
 			isPercent = append(isPercent, false)
 		case scanner.Percentage:
@@ -230,11 +227,18 @@ func parseColorFunction(
 			if err != nil {
 				return DocumentColor{}, false
 			}
+			if negateNext {
+				v = -v
+				negateNext = false
+			}
 			args = append(args, v)
 			isPercent = append(isPercent, true)
 		case scanner.Delim:
-			if tok.Value == "/" {
+			switch tok.Value {
+			case "/":
 				hasSlash = true
+			case "-":
+				negateNext = true
 			}
 		case scanner.Whitespace, scanner.Comma:
 			continue
@@ -259,6 +263,14 @@ done:
 		c, ok = buildHSL(args, isPercent, hasSlash)
 	case "hwb":
 		c, ok = buildHWB(args, isPercent, hasSlash)
+	case "lab":
+		c, ok = buildLab(args, isPercent)
+	case "lch":
+		c, ok = buildLCH(args, isPercent)
+	case "oklab":
+		c, ok = buildOklab(args, isPercent)
+	case "oklch":
+		c, ok = buildOklch(args, isPercent)
 	default:
 		return DocumentColor{}, false
 	}
@@ -411,6 +423,203 @@ func buildHWB(
 	}, true
 }
 
+// buildLab converts CIE Lab to sRGB.
+// L: [0,100], a: [-125,125], b: [-125,125]
+func buildLab(
+	args []float64,
+	isPercent []bool,
+) (Color, bool) {
+	// L percentage maps to [0,100] — same scale, no conversion
+	lVal := args[0]
+	a := args[1]
+	b := args[2]
+
+	alpha := 1.0
+	if len(args) >= 4 {
+		alpha = args[3]
+		if isPercent[3] {
+			alpha /= 100.0
+		}
+	}
+
+	r, g, bl := labToSRGB(lVal, a, b)
+	return Color{
+		Red:   clamp01(r),
+		Green: clamp01(g),
+		Blue:  clamp01(bl),
+		Alpha: clamp01(alpha),
+	}, true
+}
+
+// buildLCH converts CIE LCH to sRGB.
+// L: [0,100], C: [0,150], H: [0,360)
+func buildLCH(
+	args []float64,
+	isPercent []bool,
+) (Color, bool) {
+	// L percentage maps to [0,100] — same scale, no conversion
+	lVal := args[0]
+	chroma := args[1]
+	hue := args[2]
+
+	alpha := 1.0
+	if len(args) >= 4 {
+		alpha = args[3]
+		if isPercent[3] {
+			alpha /= 100.0
+		}
+	}
+
+	// LCH to Lab
+	hRad := hue * math.Pi / 180.0
+	a := chroma * math.Cos(hRad)
+	b := chroma * math.Sin(hRad)
+
+	r, g, bl := labToSRGB(lVal, a, b)
+	return Color{
+		Red:   clamp01(r),
+		Green: clamp01(g),
+		Blue:  clamp01(bl),
+		Alpha: clamp01(alpha),
+	}, true
+}
+
+// buildOklab converts Oklab to sRGB.
+// L: [0,1], a: [-0.4,0.4], b: [-0.4,0.4]
+func buildOklab(
+	args []float64,
+	isPercent []bool,
+) (Color, bool) {
+	lVal := args[0]
+	if isPercent[0] {
+		lVal /= 100.0
+	}
+	a := args[1]
+	b := args[2]
+
+	alpha := 1.0
+	if len(args) >= 4 {
+		alpha = args[3]
+		if isPercent[3] {
+			alpha /= 100.0
+		}
+	}
+
+	r, g, bl := oklabToSRGB(lVal, a, b)
+	return Color{
+		Red:   clamp01(r),
+		Green: clamp01(g),
+		Blue:  clamp01(bl),
+		Alpha: clamp01(alpha),
+	}, true
+}
+
+// buildOklch converts Oklch to sRGB.
+// L: [0,1], C: [0,0.4], H: [0,360)
+func buildOklch(
+	args []float64,
+	isPercent []bool,
+) (Color, bool) {
+	lVal := args[0]
+	if isPercent[0] {
+		lVal /= 100.0
+	}
+	chroma := args[1]
+	hue := args[2]
+
+	alpha := 1.0
+	if len(args) >= 4 {
+		alpha = args[3]
+		if isPercent[3] {
+			alpha /= 100.0
+		}
+	}
+
+	// Oklch to Oklab
+	hRad := hue * math.Pi / 180.0
+	a := chroma * math.Cos(hRad)
+	b := chroma * math.Sin(hRad)
+
+	r, g, bl := oklabToSRGB(lVal, a, b)
+	return Color{
+		Red:   clamp01(r),
+		Green: clamp01(g),
+		Blue:  clamp01(bl),
+		Alpha: clamp01(alpha),
+	}, true
+}
+
+// labToSRGB converts CIE Lab to linear sRGB via XYZ D65.
+func labToSRGB(
+	lVal, a, b float64,
+) (float64, float64, float64) {
+	// Lab to XYZ (D65 white point)
+	fy := (lVal + 16.0) / 116.0
+	fx := a/500.0 + fy
+	fz := fy - b/200.0
+
+	const epsilon = 216.0 / 24389.0
+	const kappa = 24389.0 / 27.0
+
+	var x, y, z float64
+	if fx*fx*fx > epsilon {
+		x = fx * fx * fx
+	} else {
+		x = (116.0*fx - 16.0) / kappa
+	}
+	if lVal > kappa*epsilon {
+		y = fy * fy * fy
+	} else {
+		y = lVal / kappa
+	}
+	if fz*fz*fz > epsilon {
+		z = fz * fz * fz
+	} else {
+		z = (116.0*fz - 16.0) / kappa
+	}
+
+	// D65 white point
+	x *= 0.95047
+	z *= 1.08883
+
+	// XYZ to linear sRGB
+	r := x*3.2404542 - y*1.5371385 - z*0.4985314
+	g := -x*0.9692660 + y*1.8760108 + z*0.0415560
+	bl := x*0.0556434 - y*0.2040259 + z*1.0572252
+
+	return linearToSRGB(r), linearToSRGB(g), linearToSRGB(bl)
+}
+
+// oklabToSRGB converts Oklab to sRGB.
+func oklabToSRGB(
+	lVal, a, b float64,
+) (float64, float64, float64) {
+	// Oklab to LMS
+	l := lVal + 0.3963377774*a + 0.2158037573*b
+	m := lVal - 0.1055613458*a - 0.0638541728*b
+	s := lVal - 0.0894841775*a - 1.2914855480*b
+
+	// Cube
+	l = l * l * l
+	m = m * m * m
+	s = s * s * s
+
+	// LMS to linear sRGB
+	r := +4.0767416621*l - 3.3077115913*m + 0.2309699292*s
+	g := -1.2684380046*l + 2.6097574011*m - 0.3413193965*s
+	bl := -0.0041960863*l - 0.7034186147*m + 1.7076147010*s
+
+	return linearToSRGB(r), linearToSRGB(g), linearToSRGB(bl)
+}
+
+// linearToSRGB applies sRGB gamma.
+func linearToSRGB(c float64) float64 {
+	if c <= 0.0031308 {
+		return 12.92 * c
+	}
+	return 1.055*math.Pow(c, 1.0/2.4) - 0.055
+}
+
 func hslToRGB(h, s, l float64) (float64, float64, float64) {
 	if s == 0 {
 		return l, l, l
@@ -480,11 +689,11 @@ func ColorPresentation(c Color) []string {
 		)
 	}
 
-	// RGB
+	// RGB (modern space-separated syntax)
 	if c.Alpha >= 1.0 {
 		presentations = append(presentations,
-			"rgb("+strconv.Itoa(r)+", "+
-				strconv.Itoa(g)+", "+
+			"rgb("+strconv.Itoa(r)+" "+
+				strconv.Itoa(g)+" "+
 				strconv.Itoa(b)+")",
 		)
 	} else {
@@ -496,7 +705,7 @@ func ColorPresentation(c Color) []string {
 		)
 	}
 
-	// HSL
+	// HSL (modern space-separated syntax)
 	h, s, l := rgbToHSL(c.Red, c.Green, c.Blue)
 	hDeg := int(math.Round(h * 360))
 	sPct := int(math.Round(s * 100))
@@ -504,8 +713,8 @@ func ColorPresentation(c Color) []string {
 
 	if c.Alpha >= 1.0 {
 		presentations = append(presentations,
-			"hsl("+strconv.Itoa(hDeg)+", "+
-				strconv.Itoa(sPct)+"%, "+
+			"hsl("+strconv.Itoa(hDeg)+" "+
+				strconv.Itoa(sPct)+"% "+
 				strconv.Itoa(lPct)+"%)",
 		)
 	} else {
