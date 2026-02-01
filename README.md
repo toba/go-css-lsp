@@ -13,7 +13,7 @@ CSS3 only — no SCSS, Sass, or LESS.
 | **Completion** | Properties, values, at-rules, pseudo-classes, pseudo-elements, HTML elements, color functions |
 | **Colors** | Color picker for hex, named colors, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()`; convert between formats |
 | **Navigation** | Go to definition, find references, document symbols, document highlights |
-| **Editing** | Rename CSS custom properties, code actions (quick fixes), formatting (supports format-on-save), selection ranges |
+| **Editing** | Rename CSS custom properties, code actions (quick fixes), formatting (expanded/compact/preserve modes), selection ranges |
 | **Structure** | Folding ranges, document links (`@import`, `url()`) |
 | **Workspace** | Cross-file CSS custom property indexing |
 
@@ -40,6 +40,32 @@ go build ./cmd/go-css-lsp
 ```bash
 go test ./...
 ```
+
+## Formatting Modes
+
+The formatter supports three modes, configured via `initializationOptions`:
+
+| Mode | Behavior |
+|------|----------|
+| **expanded** (default) | One declaration per line |
+| **compact** | Single-line rulesets when they fit within `printWidth` |
+| **preserve** | Keeps original single/multi-line layout, normalizes whitespace |
+
+Rulesets containing nested rules always use expanded format regardless of mode.
+
+```json
+{
+  "initializationOptions": {
+    "formatMode": "compact",
+    "printWidth": 80
+  }
+}
+```
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `formatMode` | string | `"expanded"` | `"expanded"`, `"compact"`, or `"preserve"` |
+| `printWidth` | int | `80` | Max line width for compact mode |
 
 ## Credits
 
