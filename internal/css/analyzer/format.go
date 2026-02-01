@@ -139,6 +139,11 @@ func (f *formatter) formatRuleset(rs *parser.Ruleset) {
 		f.writeSelector(rs.Selectors)
 	}
 
+	f.formatRulesetBody(rs)
+}
+
+// formatRulesetBody writes " {\n", the children, and "}\n".
+func (f *formatter) formatRulesetBody(rs *parser.Ruleset) {
 	f.buf.WriteString(" {\n")
 	f.indent++
 
@@ -220,7 +225,7 @@ func (f *formatter) formatDeclaration(
 			lineLen += 11 // " !important"
 		}
 
-		commaIndices := f.topLevelCommaIndices(decl.Value)
+		commaIndices := f.shallowestCommaIndices(decl.Value)
 
 		if lineLen > f.opts.PrintWidth && len(commaIndices) > 0 {
 			f.writeIndent()
@@ -250,12 +255,19 @@ func (f *formatter) formatDeclaration(
 	f.buf.WriteString(";\n")
 }
 
-// topLevelCommaIndices returns token indices of commas that
-// are not inside parentheses (depth 0).
-func (f *formatter) topLevelCommaIndices(
+// shallowestCommaIndices returns token indices of commas at
+// the shallowest nesting depth. It first looks for depth-0
+// commas; if none exist, it returns commas at the next
+// shallowest depth that contains any.
+func (f *formatter) shallowestCommaIndices(
 	v *parser.Value,
 ) []int {
-	var indices []int
+	type commaInfo struct {
+		index int
+		depth int
+	}
+	var commas []commaInfo
+	minDepth := -1
 	depth := 0
 	for i, tok := range v.Tokens {
 		switch tok.Kind {
@@ -266,9 +278,16 @@ func (f *formatter) topLevelCommaIndices(
 				depth--
 			}
 		case scanner.Comma:
-			if depth == 0 {
-				indices = append(indices, i)
+			commas = append(commas, commaInfo{i, depth})
+			if minDepth < 0 || depth < minDepth {
+				minDepth = depth
 			}
+		}
+	}
+	var indices []int
+	for _, c := range commas {
+		if c.depth == minDepth {
+			indices = append(indices, c.index)
 		}
 	}
 	return indices
@@ -619,8 +638,26 @@ func (f *formatter) isFirstChildInline(
 	)
 }
 
+// isSecondSelectorInline reports whether the second selector
+// in a list starts on the same line as the first selector.
+func (f *formatter) isSecondSelectorInline(
+	sl *parser.SelectorList,
+) bool {
+	if len(sl.Selectors) < 2 {
+		return true
+	}
+	firstEnd := sl.Selectors[0].EndPos
+	secondStart := sl.Selectors[1].StartPos
+	return !bytes.ContainsRune(
+		f.src[firstEnd:secondStart], '\n',
+	)
+}
+
 // formatRulesetDetect infers single-line intent from whether
 // the first property is on the same line as the opening brace.
+// Selector lists are detected independently: if the second
+// selector is on the same line as the first, all selectors are
+// kept inline (if they fit within PrintWidth).
 func (f *formatter) formatRulesetDetect(
 	rs *parser.Ruleset,
 ) {
@@ -631,6 +668,23 @@ func (f *formatter) formatRulesetDetect(
 			f.writeIndent()
 			f.buf.WriteString(line)
 			f.buf.WriteByte('\n')
+			return
+		}
+	}
+
+	// Detect selector layout: if the second selector is on the
+	// same line as the first, keep selectors inline when they
+	// fit within PrintWidth.
+	if rs.Selectors != nil &&
+		len(rs.Selectors.Selectors) > 1 &&
+		f.isSecondSelectorInline(rs.Selectors) {
+		var sb strings.Builder
+		f.writeSelectorTo(&sb, rs.Selectors)
+		selStr := sb.String()
+		if f.indentWidth()+len(selStr)+2 <= f.opts.PrintWidth {
+			f.writeIndent()
+			f.buf.WriteString(selStr)
+			f.formatRulesetBody(rs)
 			return
 		}
 	}

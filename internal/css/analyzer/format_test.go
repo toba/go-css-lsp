@@ -425,14 +425,15 @@ func TestFormat_ShortValueStaysSingleLine(t *testing.T) {
 	}
 }
 
-func TestFormat_LongValueNoTopLevelCommasStaysSingleLine(t *testing.T) {
-	// Value is long but all commas are inside function parens
+func TestFormat_ShortFunctionArgsStaySingleLine(t *testing.T) {
+	// Value has commas only inside function parens, but the line
+	// fits within printWidth so it stays single-line.
 	src := []byte(`.foo { color: rgb(100, 200, 300); }`)
 	ss, _ := parser.Parse(src)
 	result := Format(ss, src, FormatOptions{
 		TabSize:      2,
 		InsertSpaces: true,
-		PrintWidth:   20,
+		PrintWidth:   80,
 	})
 
 	expected := `.foo {
@@ -479,6 +480,31 @@ func TestFormatCompact_LongValueWraps(t *testing.T) {
   background:
     linear-gradient(red, blue) padding-box,
     conic-gradient(green, yellow) border-box;
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormat_LongValueWrapsAtShallowestCommas(t *testing.T) {
+	// All commas are inside light-dark() at depth 1, but the line
+	// exceeds printWidth so it should still wrap.
+	src := []byte(`:root {
+  --color-bg-top: light-dark(hsl(from var(--brand-deep-pockets) h calc(s - 40) calc(l + 40)), hsl(from var(--brand-deep-pockets) h calc(s - 40) l));
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		PrintWidth:   80,
+	})
+
+	expected := `:root {
+  --color-bg-top:
+    light-dark(hsl(from var(--brand-deep-pockets) h calc(s - 40) calc(l + 40)),
+    hsl(from var(--brand-deep-pockets) h calc(s - 40) l));
 }
 `
 	if result != expected {
@@ -594,22 +620,57 @@ func TestFormatDetect_MultiSelectorInlineFits(t *testing.T) {
 }
 
 func TestFormatDetect_MultiSelectorNewLine(t *testing.T) {
-	// Multi-selector with first prop on new line → expanded
+	// Multi-selector on same line, first prop on new line →
+	// selectors stay inline, body expanded
 	src := []byte("ul, ol {\n  margin: 0;\n}")
 	ss, _ := parser.Parse(src)
 	result := Format(ss, src, detectOpts(80))
-	expected := "ul,\nol {\n  margin: 0;\n}\n"
+	expected := "ul, ol {\n  margin: 0;\n}\n"
 	if result != expected {
 		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
 	}
 }
 
 func TestFormatDetect_MultiSelectorInlineExceedsPrintWidth(t *testing.T) {
-	// Multi-selector inline but exceeds print-width → falls back to expanded
+	// Multi-selector inline, exceeds single-line print-width →
+	// selectors stay inline (they fit), body expands
 	src := []byte(`ul, ol { margin: 0; }`)
 	ss, _ := parser.Parse(src)
 	result := Format(ss, src, detectOpts(15))
-	expected := "ul,\nol {\n  margin: 0;\n}\n"
+	expected := "ul, ol {\n  margin: 0;\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_SelectorListDetectsInline(t *testing.T) {
+	// Second selector on same line → all selectors inline
+	src := []byte("button, input,\nselect,\ntextarea {\n  font: inherit;\n}")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := "button, input, select, textarea {\n  font: inherit;\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_SelectorListDetectsNewLine(t *testing.T) {
+	// Second selector on new line → all selectors on new lines
+	src := []byte("button,\ninput,\nselect,\ntextarea {\n  font: inherit;\n}")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := "button,\ninput,\nselect,\ntextarea {\n  font: inherit;\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_SelectorListInlineExceedsWidth(t *testing.T) {
+	// Selectors inline in source but don't fit → multi-line
+	src := []byte("button, input, select, textarea {\n  font: inherit;\n}")
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(20))
+	expected := "button,\ninput,\nselect,\ntextarea {\n  font: inherit;\n}\n"
 	if result != expected {
 		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
 	}
