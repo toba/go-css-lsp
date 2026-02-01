@@ -81,9 +81,20 @@ type InitializeParams struct {
 
 // ServerCapabilities describes this server's capabilities.
 type ServerCapabilities struct {
-	TextDocumentSync   int                `json:"textDocumentSync"`
-	HoverProvider      bool               `json:"hoverProvider"`
-	CompletionProvider *CompletionOptions `json:"completionProvider,omitempty"`
+	TextDocumentSync           int                `json:"textDocumentSync"`
+	HoverProvider              bool               `json:"hoverProvider"`
+	CompletionProvider         *CompletionOptions `json:"completionProvider,omitempty"`
+	ColorProvider              bool               `json:"colorProvider,omitempty"`
+	DocumentSymbolProvider     bool               `json:"documentSymbolProvider,omitempty"`
+	DefinitionProvider         bool               `json:"definitionProvider,omitempty"`
+	ReferencesProvider         bool               `json:"referencesProvider,omitempty"`
+	CodeActionProvider         bool               `json:"codeActionProvider,omitempty"`
+	DocumentHighlightProvider  bool               `json:"documentHighlightProvider,omitempty"`
+	FoldingRangeProvider       bool               `json:"foldingRangeProvider,omitempty"`
+	DocumentLinkProvider       bool               `json:"documentLinkProvider,omitempty"`
+	DocumentFormattingProvider bool               `json:"documentFormattingProvider,omitempty"`
+	SelectionRangeProvider     bool               `json:"selectionRangeProvider,omitempty"`
+	RenameProvider             *RenameOptions     `json:"renameProvider,omitempty"`
 }
 
 // CompletionOptions describes completion provider capabilities.
@@ -189,8 +200,21 @@ func ProcessInitializeRequest(
 		Id:      req.Id,
 		Result: InitializeResult{
 			Capabilities: ServerCapabilities{
-				TextDocumentSync: TextDocumentSyncFull,
-				HoverProvider:    true,
+				TextDocumentSync:           TextDocumentSyncFull,
+				HoverProvider:              true,
+				ColorProvider:              true,
+				DocumentSymbolProvider:     true,
+				DefinitionProvider:         true,
+				ReferencesProvider:         true,
+				CodeActionProvider:         true,
+				DocumentHighlightProvider:  true,
+				FoldingRangeProvider:       true,
+				DocumentLinkProvider:       true,
+				DocumentFormattingProvider: true,
+				SelectionRangeProvider:     true,
+				RenameProvider: &RenameOptions{
+					PrepareProvider: true,
+				},
 				CompletionProvider: &CompletionOptions{
 					TriggerCharacters: []string{
 						":", "@", ".", "#", "-", " ",
@@ -404,4 +428,165 @@ type CompletionParams struct {
 type CompletionContext struct {
 	TriggerKind      int    `json:"triggerKind"`
 	TriggerCharacter string `json:"triggerCharacter,omitempty"`
+}
+
+// DocumentColorParams for textDocument/documentColor.
+type DocumentColorParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+}
+
+// LSPColor represents a color in the LSP protocol.
+type LSPColor struct {
+	Red   float64 `json:"red"`
+	Green float64 `json:"green"`
+	Blue  float64 `json:"blue"`
+	Alpha float64 `json:"alpha"`
+}
+
+// ColorInformation represents a color range in a document.
+type ColorInformation struct {
+	Range Range    `json:"range"`
+	Color LSPColor `json:"color"`
+}
+
+// ColorPresentationParams for textDocument/colorPresentation.
+type ColorPresentationParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+	Color        LSPColor               `json:"color"`
+	Range        Range                  `json:"range"`
+}
+
+// ColorPresentation represents how a color is presented.
+type ColorPresentation struct {
+	Label    string    `json:"label"`
+	TextEdit *TextEdit `json:"textEdit,omitempty"`
+}
+
+// TextEdit represents a text edit.
+type TextEdit struct {
+	Range   Range  `json:"range"`
+	NewText string `json:"newText"`
+}
+
+// DocumentSymbolParams for textDocument/documentSymbol.
+type DocumentSymbolParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+}
+
+// LSPDocumentSymbol represents a symbol in a document.
+type LSPDocumentSymbol struct {
+	Name           string              `json:"name"`
+	Kind           int                 `json:"kind"`
+	Range          Range               `json:"range"`
+	SelectionRange Range               `json:"selectionRange"`
+	Children       []LSPDocumentSymbol `json:"children,omitempty"`
+}
+
+// ReferenceParams for textDocument/references.
+type ReferenceParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+	Position     Position               `json:"position"`
+	Context      ReferenceContext       `json:"context"`
+}
+
+// ReferenceContext for reference requests.
+type ReferenceContext struct {
+	IncludeDeclaration bool `json:"includeDeclaration"`
+}
+
+// LSPLocation represents a location in a document.
+type LSPLocation struct {
+	URI   string `json:"uri"`
+	Range Range  `json:"range"`
+}
+
+// CodeActionParams for textDocument/codeAction.
+type CodeActionParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+	Range        Range                  `json:"range"`
+	Context      CodeActionContext      `json:"context"`
+}
+
+// CodeActionContext carries diagnostics for code actions.
+type CodeActionContext struct {
+	Diagnostics []Diagnostic `json:"diagnostics"`
+}
+
+// LSPCodeAction represents a code action response.
+type LSPCodeAction struct {
+	Title string         `json:"title"`
+	Kind  string         `json:"kind,omitempty"`
+	Edit  *WorkspaceEdit `json:"edit,omitempty"`
+}
+
+// WorkspaceEdit represents changes to workspace resources.
+type WorkspaceEdit struct {
+	Changes map[string][]TextEdit `json:"changes,omitempty"`
+}
+
+// LSPDocumentHighlight represents a highlighted range.
+type LSPDocumentHighlight struct {
+	Range Range `json:"range"`
+	Kind  int   `json:"kind"`
+}
+
+// FoldingRangeParams for textDocument/foldingRange.
+type FoldingRangeParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+}
+
+// LSPFoldingRange represents a foldable range.
+type LSPFoldingRange struct {
+	StartLine      int    `json:"startLine"`
+	StartCharacter int    `json:"startCharacter,omitempty"`
+	EndLine        int    `json:"endLine"`
+	EndCharacter   int    `json:"endCharacter,omitempty"`
+	Kind           string `json:"kind,omitempty"`
+}
+
+// DocumentLinkParams for textDocument/documentLink.
+type DocumentLinkParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+}
+
+// LSPDocumentLink represents a link in a document.
+type LSPDocumentLink struct {
+	Range  Range  `json:"range"`
+	Target string `json:"target"`
+}
+
+// DocumentFormattingParams for textDocument/formatting.
+type DocumentFormattingParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+	Options      FormattingOptions      `json:"options"`
+}
+
+// FormattingOptions describes formatting preferences.
+type FormattingOptions struct {
+	TabSize      int  `json:"tabSize"`
+	InsertSpaces bool `json:"insertSpaces"`
+}
+
+// RenameOptions for rename provider capability.
+type RenameOptions struct {
+	PrepareProvider bool `json:"prepareProvider"`
+}
+
+// SelectionRangeParams for textDocument/selectionRange.
+type SelectionRangeParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+	Positions    []Position             `json:"positions"`
+}
+
+// LSPSelectionRange represents a selection range.
+type LSPSelectionRange struct {
+	Range  Range              `json:"range"`
+	Parent *LSPSelectionRange `json:"parent,omitempty"`
+}
+
+// RenameParams for textDocument/rename.
+type RenameParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+	Position     Position               `json:"position"`
+	NewName      string                 `json:"newName"`
 }

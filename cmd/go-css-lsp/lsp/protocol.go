@@ -4,11 +4,6 @@ package lsp
 const (
 	JSONRPCVersion = "2.0"
 
-	SeverityError   = 1
-	SeverityWarning = 2
-	SeverityInfo    = 3
-	SeverityHint    = 4
-
 	TextDocumentSyncFull = 1
 
 	ErrorInvalidRequest = -32600
@@ -26,6 +21,19 @@ const (
 	MethodHover              = "textDocument/hover"
 	MethodCompletion         = "textDocument/completion"
 	MethodPublishDiagnostics = "textDocument/publishDiagnostics"
+	MethodDocumentColor      = "textDocument/documentColor"
+	MethodColorPresentation  = "textDocument/colorPresentation"
+	MethodDocumentSymbol     = "textDocument/documentSymbol"
+	MethodDefinition         = "textDocument/definition"
+	MethodReferences         = "textDocument/references"
+	MethodCodeAction         = "textDocument/codeAction"
+	MethodDocumentHighlight  = "textDocument/documentHighlight"
+	MethodFoldingRange       = "textDocument/foldingRange"
+	MethodDocumentLink       = "textDocument/documentLink"
+	MethodFormatting         = "textDocument/formatting"
+	MethodSelectionRange     = "textDocument/selectionRange"
+	MethodPrepareRename      = "textDocument/prepareRename"
+	MethodRename             = "textDocument/rename"
 )
 
 // Completion trigger kinds.
@@ -33,16 +41,6 @@ const (
 	CompletionTriggerInvoked                  = 1
 	CompletionTriggerCharacter                = 2
 	CompletionTriggerForIncompleteCompletions = 3
-)
-
-// Completion item kinds.
-const (
-	CompletionItemKindProperty = 10
-	CompletionItemKindKeyword  = 14
-	CompletionItemKindUnit     = 11
-	CompletionItemKindValue    = 12
-	CompletionItemKindFunction = 3
-	CompletionItemKindColor    = 16
 )
 
 // LSP header constants.

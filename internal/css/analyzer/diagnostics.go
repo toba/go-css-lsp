@@ -8,6 +8,20 @@ import (
 	"github.com/toba/go-css-lsp/internal/css/scanner"
 )
 
+// vendorPrefixes lists common CSS vendor prefixes.
+var vendorPrefixes = []string{
+	"-webkit-", "-moz-", "-ms-", "-o-",
+}
+
+func hasVendorPrefix(name string) bool {
+	for _, p := range vendorPrefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
 // Analyze returns diagnostics for the parsed stylesheet.
 func Analyze(
 	ss *parser.Stylesheet,
@@ -40,14 +54,14 @@ func (a *diagAnalyzer) analyzeStylesheet(ss *parser.Stylesheet) {
 func (a *diagAnalyzer) analyzeRuleset(rs *parser.Ruleset) {
 	// Check for empty rulesets
 	if len(rs.Declarations) == 0 {
-		line, char := offsetToLineChar(
+		line, char := OffsetToLineChar(
 			a.src, rs.Offset(),
 		)
-		endLine, endChar := offsetToLineChar(
+		endLine, endChar := OffsetToLineChar(
 			a.src, rs.End(),
 		)
 		a.diags = append(a.diags, Diagnostic{
-			Message:   "empty ruleset",
+			Message:   EmptyRulesetMsg,
 			StartLine: line,
 			StartChar: char,
 			EndLine:   endLine,
@@ -70,20 +84,20 @@ func (a *diagAnalyzer) analyzeDeclaration(
 	propName := decl.Property.Value
 
 	// Skip custom properties
-	if strings.HasPrefix(propName, "--") {
+	if IsCustomProperty(propName) {
 		return
 	}
 
 	// Check for unknown properties
 	if !data.IsKnownProperty(propName) {
-		line, char := offsetToLineChar(
+		line, char := OffsetToLineChar(
 			a.src, decl.Property.Offset,
 		)
-		endLine, endChar := offsetToLineChar(
+		endLine, endChar := OffsetToLineChar(
 			a.src, decl.Property.End,
 		)
 		a.diags = append(a.diags, Diagnostic{
-			Message:   "unknown property '" + propName + "'",
+			Message:   UnknownPropertyMessage(propName),
 			StartLine: line,
 			StartChar: char,
 			EndLine:   endLine,
@@ -94,14 +108,14 @@ func (a *diagAnalyzer) analyzeDeclaration(
 
 	// Check for duplicate properties
 	if seen[propName] {
-		line, char := offsetToLineChar(
+		line, char := OffsetToLineChar(
 			a.src, decl.Property.Offset,
 		)
-		endLine, endChar := offsetToLineChar(
+		endLine, endChar := OffsetToLineChar(
 			a.src, decl.Property.End,
 		)
 		a.diags = append(a.diags, Diagnostic{
-			Message:   "duplicate property '" + propName + "'",
+			Message:   DuplicatePropertyMessage(propName),
 			StartLine: line,
 			StartChar: char,
 			EndLine:   endLine,
@@ -110,18 +124,98 @@ func (a *diagAnalyzer) analyzeDeclaration(
 		})
 	}
 	seen[propName] = true
+
+	// Check for zero with units (e.g. 0px -> 0)
+	a.checkZeroWithUnit(decl)
+
+	// Check for !important usage
+	if decl.Important {
+		line, char := OffsetToLineChar(
+			a.src, decl.StartPos,
+		)
+		endLine, endChar := OffsetToLineChar(
+			a.src, decl.EndPos,
+		)
+		a.diags = append(a.diags, Diagnostic{
+			Message:   AvoidImportantMsg,
+			StartLine: line,
+			StartChar: char,
+			EndLine:   endLine,
+			EndChar:   endChar,
+			Severity:  SeverityHint,
+		})
+	}
+
+	// Check for vendor prefixes
+	if hasVendorPrefix(propName) {
+		line, char := OffsetToLineChar(
+			a.src, decl.Property.Offset,
+		)
+		endLine, endChar := OffsetToLineChar(
+			a.src, decl.Property.End,
+		)
+		a.diags = append(a.diags, Diagnostic{
+			Message:   VendorPrefixMessage(propName),
+			StartLine: line,
+			StartChar: char,
+			EndLine:   endLine,
+			EndChar:   endChar,
+			Severity:  SeverityHint,
+		})
+	}
+}
+
+func (a *diagAnalyzer) checkZeroWithUnit(
+	decl *parser.Declaration,
+) {
+	if decl.Value == nil {
+		return
+	}
+	for _, tok := range decl.Value.Tokens {
+		if tok.Kind != scanner.Dimension {
+			continue
+		}
+		val := tok.Value
+		if len(val) < 2 || val[0] != '0' {
+			continue
+		}
+		// Check it's actually "0" + unit, not "0.5px" etc.
+		unit := val[1:]
+		if unit != "" && (unit[0] >= '0' && unit[0] <= '9' || unit[0] == '.') {
+			continue
+		}
+		// Skip time units where 0 is meaningful
+		if unit == "s" || unit == "ms" {
+			continue
+		}
+		line, char := OffsetToLineChar(
+			a.src, tok.Offset,
+		)
+		endLine, endChar := OffsetToLineChar(
+			a.src, tok.End,
+		)
+		a.diags = append(a.diags, Diagnostic{
+			Message: "unnecessary unit: '" +
+				val + "' can be written as '0'",
+			StartLine: line,
+			StartChar: char,
+			EndLine:   endLine,
+			EndChar:   endChar,
+			Severity:  SeverityHint,
+		})
+	}
 }
 
 func (a *diagAnalyzer) analyzeAtRule(rule *parser.AtRule) {
 	if !data.IsKnownAtRule(rule.Name) {
-		line, char := offsetToLineChar(
+		line, char := OffsetToLineChar(
 			a.src, rule.Offset(),
 		)
-		endLine, endChar := offsetToLineChar(
+		endLine, endChar := OffsetToLineChar(
 			a.src, rule.Offset()+len(rule.Name)+1,
 		)
 		a.diags = append(a.diags, Diagnostic{
-			Message:   "unknown at-rule '@" + rule.Name + "'",
+			Message:   UnknownAtRuleMessage(rule.Name),
 			StartLine: line,
 			StartChar: char,
 			EndLine:   endLine,
@@ -133,24 +227,6 @@ func (a *diagAnalyzer) analyzeAtRule(rule *parser.AtRule) {
 	if rule.Block != nil {
 		a.analyzeStylesheet(rule.Block)
 	}
-}
-
-// offsetToLineChar converts a byte offset to line/character.
-func offsetToLineChar(src []byte, offset int) (int, int) {
-	line := 0
-	char := 0
-	for i := range offset {
-		if i >= len(src) {
-			break
-		}
-		if src[i] == '\n' {
-			line++
-			char = 0
-		} else {
-			char++
-		}
-	}
-	return line, char
 }
 
 // nodeAtOffset finds what kind of context the offset is in.

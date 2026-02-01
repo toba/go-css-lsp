@@ -7,16 +7,6 @@ import (
 	"github.com/toba/go-css-lsp/internal/css/parser"
 )
 
-// Completion item kinds matching LSP spec.
-const (
-	KindProperty = 10
-	KindKeyword  = 14
-	KindUnit     = 11
-	KindValue    = 12
-	KindFunction = 3
-	KindColor    = 16
-)
-
 // Complete returns completion items for the given byte offset.
 func Complete(
 	ss *parser.Stylesheet,
@@ -296,22 +286,23 @@ func completePseudoElements(
 	return items
 }
 
+// htmlElements lists common HTML element names for selector
+// completion.
+var htmlElements = []string{
+	"a", "article", "aside", "body", "button",
+	"div", "footer", "form", "h1", "h2", "h3",
+	"h4", "h5", "h6", "header", "html", "img",
+	"input", "label", "li", "main", "nav", "ol",
+	"p", "section", "select", "span", "table",
+	"textarea", "ul",
+}
+
 func completeSelectorStart(
 	prefix string,
 ) []CompletionItem {
 	var items []CompletionItem
 
-	// Offer common HTML elements
-	elements := []string{
-		"a", "article", "aside", "body", "button",
-		"div", "footer", "form", "h1", "h2", "h3",
-		"h4", "h5", "h6", "header", "html", "img",
-		"input", "label", "li", "main", "nav", "ol",
-		"p", "section", "select", "span", "table",
-		"textarea", "ul",
-	}
-
-	for _, el := range elements {
+	for _, el := range htmlElements {
 		if prefix != "" &&
 			!strings.HasPrefix(el, prefix) {
 			continue
