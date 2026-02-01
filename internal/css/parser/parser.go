@@ -199,8 +199,12 @@ func (p *Parser) parseBlock() *Stylesheet {
 }
 
 // looksLikeDeclaration peeks ahead to determine whether the
-// current position starts a declaration (ident : ...) or a
-// selector.
+// current position starts a declaration (ident : value ;) or a
+// selector (e.g. a:hover { ... }).
+//
+// After confirming ident + colon, it scans forward: if { appears
+// before ; or }, it's a selector (like "a:hover {}"). If ; or }
+// appears first, it's a declaration.
 func (p *Parser) looksLikeDeclaration() bool {
 	saved := p.pos
 	defer func() { p.pos = saved }()
@@ -234,7 +238,42 @@ func (p *Parser) looksLikeDeclaration() bool {
 		return false
 	}
 
-	return p.tokens[p.pos].Kind == scanner.Colon
+	if p.tokens[p.pos].Kind != scanner.Colon {
+		return false
+	}
+	p.pos++ // skip past the colon
+
+	// Scan forward: if { appears before ; or } (tracking paren
+	// depth), this is a selector like "a:hover { ... }".
+	parenDepth := 0
+	for p.pos < len(p.tokens) {
+		tk := p.tokens[p.pos]
+		switch tk.Kind {
+		case scanner.ParenOpen, scanner.Function:
+			parenDepth++
+		case scanner.ParenClose:
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case scanner.BraceOpen:
+			if parenDepth == 0 {
+				return false // selector
+			}
+		case scanner.Semicolon:
+			if parenDepth == 0 {
+				return true // declaration
+			}
+		case scanner.BraceClose:
+			if parenDepth == 0 {
+				return true // declaration (no semicolon)
+			}
+		case scanner.EOF:
+			return true
+		}
+		p.pos++
+	}
+
+	return true
 }
 
 func (p *Parser) parseRuleset() *Ruleset {
@@ -256,9 +295,12 @@ func (p *Parser) parseRuleset() *Ruleset {
 	}
 	p.next() // consume {
 
-	// Parse declarations
+	// Parse block children: declarations, nested rulesets,
+	// nested at-rules, and comments.
 	for {
-		p.skipWhitespaceAndComments()
+		comments := p.skipWhitespaceAndComments()
+		rs.Children = append(rs.Children, comments...)
+
 		t = p.peek()
 
 		if t.Kind == scanner.BraceClose {
@@ -276,11 +318,34 @@ func (p *Parser) parseRuleset() *Ruleset {
 			return rs
 		}
 
-		decl := p.parseDeclaration()
-		if decl != nil {
-			rs.Declarations = append(
-				rs.Declarations, decl,
-			)
+		// Three-way branch (matches vscode-css-languageservice):
+		// 1. @ → nested at-rule
+		if t.Kind == scanner.AtKeyword {
+			node := p.parseAtRule()
+			rs.Children = append(rs.Children, node)
+			continue
+		}
+
+		// 2. Non-ident start → clearly a nested selector
+		if t.Kind != scanner.Ident {
+			node := p.parseRuleset()
+			if node != nil {
+				rs.Children = append(rs.Children, node)
+			}
+			continue
+		}
+
+		// 3. Ident → ambiguous, use lookahead
+		if p.looksLikeDeclaration() {
+			decl := p.parseDeclaration()
+			if decl != nil {
+				rs.Children = append(rs.Children, decl)
+			}
+		} else {
+			node := p.parseRuleset()
+			if node != nil {
+				rs.Children = append(rs.Children, node)
+			}
 		}
 	}
 }

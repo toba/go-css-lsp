@@ -125,13 +125,40 @@ func (f *formatter) formatRuleset(rs *parser.Ruleset) {
 	f.buf.WriteString(" {\n")
 	f.indent++
 
-	for _, decl := range rs.Declarations {
-		f.formatDeclaration(decl)
+	for i, child := range rs.Children {
+		switch n := child.(type) {
+		case *parser.Declaration:
+			f.formatDeclaration(n)
+		case *parser.Ruleset:
+			if i > 0 {
+				f.buf.WriteByte('\n')
+			}
+			f.dispatchRuleset(n)
+		case *parser.AtRule:
+			if i > 0 {
+				f.buf.WriteByte('\n')
+			}
+			f.formatAtRule(n)
+		case *parser.Comment:
+			f.formatComment(n)
+		}
 	}
 
 	f.indent--
 	f.writeIndent()
 	f.buf.WriteString("}\n")
+}
+
+// hasNestedRules reports whether a ruleset contains any nested
+// rulesets or at-rules (not just declarations).
+func hasNestedRules(rs *parser.Ruleset) bool {
+	for _, child := range rs.Children {
+		switch child.(type) {
+		case *parser.Ruleset, *parser.AtRule:
+			return true
+		}
+	}
+	return false
 }
 
 func (f *formatter) writeSelector(sl *parser.SelectorList) {
@@ -229,9 +256,13 @@ func (f *formatter) formatAtRule(ar *parser.AtRule) {
 		f.indent++
 		for i, child := range ar.Block.Children {
 			if i > 0 {
-				f.buf.WriteByte('\n')
+				if _, isDecl := child.(*parser.Declaration); !isDecl {
+					f.buf.WriteByte('\n')
+				}
 			}
 			switch n := child.(type) {
+			case *parser.Declaration:
+				f.formatDeclaration(n)
 			case *parser.Ruleset:
 				f.dispatchRuleset(n)
 			case *parser.AtRule:
@@ -277,13 +308,15 @@ func (f *formatter) buildSingleLine(
 		f.writeSelectorTo(&sb, rs.Selectors)
 	}
 
-	if len(rs.Declarations) == 0 {
+	decls := rs.Declarations()
+
+	if len(decls) == 0 && !hasNestedRules(rs) {
 		sb.WriteString(" {}")
 		return sb.String()
 	}
 
 	sb.WriteString(" { ")
-	for i, decl := range rs.Declarations {
+	for i, decl := range decls {
 		if i > 0 {
 			sb.WriteByte(' ')
 		}
@@ -376,7 +409,7 @@ func (f *formatter) rulesetHasCommentInSource(
 func (f *formatter) formatRulesetCompact(
 	rs *parser.Ruleset,
 ) {
-	if f.rulesetHasCommentInSource(rs) {
+	if hasNestedRules(rs) || f.rulesetHasCommentInSource(rs) {
 		f.formatRuleset(rs)
 		return
 	}
@@ -415,7 +448,8 @@ func (f *formatter) isOriginalSingleLine(
 func (f *formatter) formatRulesetPreserve(
 	rs *parser.Ruleset,
 ) {
-	if f.isOriginalSingleLine(rs.StartPos, rs.EndPos) {
+	if !hasNestedRules(rs) &&
+		f.isOriginalSingleLine(rs.StartPos, rs.EndPos) {
 		line := f.buildSingleLine(rs)
 		f.writeIndent()
 		f.buf.WriteString(line)

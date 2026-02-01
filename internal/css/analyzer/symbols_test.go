@@ -105,6 +105,35 @@ func TestFindDocumentSymbols_CustomProperties(t *testing.T) {
 	}
 }
 
+func TestFindDocumentSymbols_NestedRulesets(t *testing.T) {
+	src := []byte(`
+.parent {
+  color: red;
+  &:hover { color: blue; }
+  .child { font-size: 14px; }
+}
+`)
+	ss, _ := parser.Parse(src)
+	symbols := FindDocumentSymbols(ss, src)
+
+	if len(symbols) != 1 {
+		t.Fatalf("expected 1 symbol, got %d", len(symbols))
+	}
+
+	parent := symbols[0]
+	if parent.Name != ".parent" {
+		t.Errorf("expected .parent, got %s", parent.Name)
+	}
+
+	// Should have 2 nested ruleset children
+	if len(parent.Children) != 2 {
+		t.Fatalf(
+			"expected 2 children, got %d",
+			len(parent.Children),
+		)
+	}
+}
+
 func TestFindDocumentSymbols_Empty(t *testing.T) {
 	src := []byte(`/* empty */`)
 	ss, _ := parser.Parse(src)

@@ -23,14 +23,14 @@ func TestParseSimpleRule(t *testing.T) {
 		t.Fatalf("expected Ruleset, got %T", ss.Children[0])
 	}
 
-	if len(rs.Declarations) != 1 {
+	if len(rs.Declarations()) != 1 {
 		t.Fatalf(
 			"expected 1 declaration, got %d",
-			len(rs.Declarations),
+			len(rs.Declarations()),
 		)
 	}
 
-	decl := rs.Declarations[0]
+	decl := rs.Declarations()[0]
 	if decl.Property.Value != "color" {
 		t.Errorf(
 			"expected property 'color', got %q",
@@ -59,20 +59,20 @@ func TestParseMultipleDeclarations(t *testing.T) {
 	}
 
 	rs := ss.Children[0].(*Ruleset)
-	if len(rs.Declarations) != 2 {
+	if len(rs.Declarations()) != 2 {
 		t.Fatalf(
 			"expected 2 declarations, got %d",
-			len(rs.Declarations),
+			len(rs.Declarations()),
 		)
 	}
 
-	if rs.Declarations[0].Property.Value != "color" {
+	if rs.Declarations()[0].Property.Value != "color" {
 		t.Errorf("expected 'color', got %q",
-			rs.Declarations[0].Property.Value)
+			rs.Declarations()[0].Property.Value)
 	}
-	if rs.Declarations[1].Property.Value != "font-size" {
+	if rs.Declarations()[1].Property.Value != "font-size" {
 		t.Errorf("expected 'font-size', got %q",
-			rs.Declarations[1].Property.Value)
+			rs.Declarations()[1].Property.Value)
 	}
 }
 
@@ -85,7 +85,7 @@ func TestParseImportant(t *testing.T) {
 	}
 
 	rs := ss.Children[0].(*Ruleset)
-	if !rs.Declarations[0].Important {
+	if !rs.Declarations()[0].Important {
 		t.Error("expected !important flag")
 	}
 }
@@ -191,14 +191,14 @@ func TestParseCustomProperty(t *testing.T) {
 	}
 
 	rs := ss.Children[0].(*Ruleset)
-	if len(rs.Declarations) != 1 {
+	if len(rs.Declarations()) != 1 {
 		t.Fatalf(
 			"expected 1 declaration, got %d",
-			len(rs.Declarations),
+			len(rs.Declarations()),
 		)
 	}
 
-	decl := rs.Declarations[0]
+	decl := rs.Declarations()[0]
 	if decl.Property.Value != "--main-color" {
 		t.Errorf("expected '--main-color', got %q",
 			decl.Property.Value)
@@ -220,6 +220,219 @@ func TestParseEmpty(t *testing.T) {
 	}
 }
 
+func TestParseNesting_AmpersandSelector(t *testing.T) {
+	src := `.parent { color: red; &:hover { color: blue; } }`
+	ss, errs := Parse([]byte(src))
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	rs := ss.Children[0].(*Ruleset)
+	if len(rs.Declarations()) != 1 {
+		t.Fatalf(
+			"expected 1 declaration, got %d",
+			len(rs.Declarations()),
+		)
+	}
+
+	// Find nested ruleset
+	var nested *Ruleset
+	for _, child := range rs.Children {
+		if r, ok := child.(*Ruleset); ok {
+			nested = r
+			break
+		}
+	}
+	if nested == nil {
+		t.Fatal("expected nested ruleset")
+	}
+	if len(nested.Declarations()) != 1 {
+		t.Fatalf(
+			"expected 1 nested declaration, got %d",
+			len(nested.Declarations()),
+		)
+	}
+	if nested.Declarations()[0].Property.Value != "color" {
+		t.Errorf("expected 'color', got %q",
+			nested.Declarations()[0].Property.Value)
+	}
+}
+
+func TestParseNesting_BareSelector(t *testing.T) {
+	src := `.parent { color: red; .child { font-size: 14px; } }`
+	ss, errs := Parse([]byte(src))
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	rs := ss.Children[0].(*Ruleset)
+	if len(rs.Declarations()) != 1 {
+		t.Fatalf(
+			"expected 1 declaration, got %d",
+			len(rs.Declarations()),
+		)
+	}
+
+	var nested *Ruleset
+	for _, child := range rs.Children {
+		if r, ok := child.(*Ruleset); ok {
+			nested = r
+			break
+		}
+	}
+	if nested == nil {
+		t.Fatal("expected nested ruleset for .child")
+	}
+	if len(nested.Declarations()) != 1 {
+		t.Fatalf(
+			"expected 1 nested declaration, got %d",
+			len(nested.Declarations()),
+		)
+	}
+}
+
+func TestParseNesting_IdentDisambiguation(t *testing.T) {
+	// "a:hover { ... }" starts with ident then colon,
+	// but should be parsed as a nested selector, not a
+	// declaration.
+	src := `.parent { a:hover { color: blue; } }`
+	ss, errs := Parse([]byte(src))
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	rs := ss.Children[0].(*Ruleset)
+	// No declarations in parent
+	if len(rs.Declarations()) != 0 {
+		t.Fatalf(
+			"expected 0 declarations, got %d",
+			len(rs.Declarations()),
+		)
+	}
+
+	var nested *Ruleset
+	for _, child := range rs.Children {
+		if r, ok := child.(*Ruleset); ok {
+			nested = r
+			break
+		}
+	}
+	if nested == nil {
+		t.Fatal("expected nested ruleset for a:hover")
+	}
+	if len(nested.Declarations()) != 1 {
+		t.Errorf("expected 1 declaration in nested rule")
+	}
+}
+
+func TestParseNesting_NestedAtRule(t *testing.T) {
+	src := `.parent { color: red; @media (hover) { color: blue; } }`
+	ss, errs := Parse([]byte(src))
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	rs := ss.Children[0].(*Ruleset)
+	if len(rs.Declarations()) != 1 {
+		t.Fatalf(
+			"expected 1 declaration, got %d",
+			len(rs.Declarations()),
+		)
+	}
+
+	var nested *AtRule
+	for _, child := range rs.Children {
+		if a, ok := child.(*AtRule); ok {
+			nested = a
+			break
+		}
+	}
+	if nested == nil {
+		t.Fatal("expected nested at-rule")
+	}
+	if nested.Name != "media" {
+		t.Errorf("expected 'media', got %q", nested.Name)
+	}
+}
+
+func TestParseNesting_MultiLevel(t *testing.T) {
+	src := `.a { .b { .c { color: red; } } }`
+	ss, errs := Parse([]byte(src))
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	a := ss.Children[0].(*Ruleset)
+	var b *Ruleset
+	for _, child := range a.Children {
+		if r, ok := child.(*Ruleset); ok {
+			b = r
+			break
+		}
+	}
+	if b == nil {
+		t.Fatal("expected nested .b ruleset")
+	}
+
+	var c *Ruleset
+	for _, child := range b.Children {
+		if r, ok := child.(*Ruleset); ok {
+			c = r
+			break
+		}
+	}
+	if c == nil {
+		t.Fatal("expected nested .c ruleset")
+	}
+	if len(c.Declarations()) != 1 {
+		t.Errorf("expected 1 declaration in .c")
+	}
+}
+
+func TestParseNesting_MixedDeclsAndNested(t *testing.T) {
+	src := `.parent {
+	color: red;
+	.child { font-size: 14px; }
+	background: blue;
+}`
+	ss, errs := Parse([]byte(src))
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	rs := ss.Children[0].(*Ruleset)
+	decls := rs.Declarations()
+	if len(decls) != 2 {
+		t.Fatalf("expected 2 declarations, got %d",
+			len(decls))
+	}
+	if decls[0].Property.Value != "color" {
+		t.Errorf("expected 'color', got %q",
+			decls[0].Property.Value)
+	}
+	if decls[1].Property.Value != "background" {
+		t.Errorf("expected 'background', got %q",
+			decls[1].Property.Value)
+	}
+
+	var nestedCount int
+	for _, child := range rs.Children {
+		if _, ok := child.(*Ruleset); ok {
+			nestedCount++
+		}
+	}
+	if nestedCount != 1 {
+		t.Errorf("expected 1 nested ruleset, got %d",
+			nestedCount)
+	}
+}
+
 func TestParseFunctionValue(t *testing.T) {
 	src := `div { background: rgb(255, 0, 0); }`
 	ss, errs := Parse([]byte(src))
@@ -229,7 +442,7 @@ func TestParseFunctionValue(t *testing.T) {
 	}
 
 	rs := ss.Children[0].(*Ruleset)
-	decl := rs.Declarations[0]
+	decl := rs.Declarations()[0]
 	if decl.Property.Value != "background" {
 		t.Errorf(
 			"expected 'background', got %q",

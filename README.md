@@ -48,8 +48,6 @@ This project was built using the following as references for feature design and 
 - **[microsoft/vscode-css-languageservice](https://github.com/microsoft/vscode-css-languageservice)** (MIT) — CSS language intelligence and LSP feature set. The primary reference for what capabilities a CSS language server should provide.
 - **[lmn451/css-variables-zed](https://github.com/lmn451/css-variables-zed)** (GPL-3.0) — workspace-wide CSS variable indexing approach.
 
-No code was copied from either project. They served as feature and architectural references for an independent Go implementation.
-
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.

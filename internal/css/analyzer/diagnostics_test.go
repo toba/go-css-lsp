@@ -126,3 +126,46 @@ func TestAnalyzeCustomProperty(t *testing.T) {
 		t.Error("custom properties should not be flagged")
 	}
 }
+
+func TestAnalyzeNesting_NoFalsePositives(t *testing.T) {
+	src := []byte(`.parent {
+	color: red;
+	&:hover { color: blue; }
+	.child { font-size: 14px; }
+}`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src)
+
+	// Should not flag nested selectors as unknown properties
+	for _, d := range diags {
+		if d.Severity == SeverityWarning {
+			t.Errorf("unexpected warning: %s", d.Message)
+		}
+	}
+}
+
+func TestAnalyzeNesting_NestedNotEmpty(t *testing.T) {
+	src := []byte(`.parent { &:hover { color: blue; } }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src)
+
+	// Parent has a nested rule, so it's not empty
+	if _, ok := findDiagnostic(
+		diags, EmptyRulesetMsg,
+	); ok {
+		t.Error("parent with nested rules should not be empty")
+	}
+}
+
+func TestAnalyzeNesting_NestedAtRule(t *testing.T) {
+	src := []byte(`.parent { @media (hover) { color: blue; } }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src)
+
+	// Should not produce unknown at-rule for @media
+	if _, ok := findDiagnostic(
+		diags, UnknownAtRuleMessage("media"),
+	); ok {
+		t.Error("@media should not be flagged as unknown")
+	}
+}

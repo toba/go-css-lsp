@@ -66,19 +66,30 @@ func rulesetSymbol(
 		SelectionEnd:   selEnd,
 	}
 
-	// Add custom property declarations as children
-	for _, decl := range r.Declarations {
-		propName := decl.Property.Value
-		if IsCustomProperty(propName) {
-			sym.Children = append(sym.Children,
-				DocumentSymbol{
-					Name:           propName,
-					Kind:           SymbolKindVariable,
-					StartPos:       decl.StartPos,
-					EndPos:         decl.EndPos,
-					SelectionStart: decl.Property.Offset,
-					SelectionEnd:   decl.Property.End,
-				},
+	// Add children: custom properties, nested rulesets, at-rules
+	for _, child := range r.Children {
+		switch n := child.(type) {
+		case *parser.Declaration:
+			propName := n.Property.Value
+			if IsCustomProperty(propName) {
+				sym.Children = append(sym.Children,
+					DocumentSymbol{
+						Name:           propName,
+						Kind:           SymbolKindVariable,
+						StartPos:       n.StartPos,
+						EndPos:         n.EndPos,
+						SelectionStart: n.Property.Offset,
+						SelectionEnd:   n.Property.End,
+					},
+				)
+			}
+		case *parser.Ruleset:
+			sym.Children = append(
+				sym.Children, rulesetSymbol(n, src),
+			)
+		case *parser.AtRule:
+			sym.Children = append(
+				sym.Children, atRuleSymbol(n, src),
 			)
 		}
 	}

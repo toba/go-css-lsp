@@ -205,7 +205,7 @@ func TestFormatCompact_RulesetWithComment(t *testing.T) {
 	ss, _ := parser.Parse(src)
 	result := Format(ss, src, compactOpts(80))
 	// Should always fall back to expanded when comment present
-	expected := ".foo {\n  color: red;\n}\n"
+	expected := ".foo {\n  /* comment */\n  color: red;\n}\n"
 	if result != expected {
 		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
 	}
@@ -269,5 +269,129 @@ func TestFormatPreserve_MixedRules(t *testing.T) {
 	expected := ".foo { color: red; }\n\n.bar {\n  background: blue;\n}\n"
 	if result != expected {
 		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+// --- Nesting tests ---
+
+func TestFormat_NestedRuleset(t *testing.T) {
+	src := []byte(`.parent{color:red;&:hover{color:blue;}}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+
+	expected := `.parent {
+  color: red;
+
+  &:hover {
+    color: blue;
+  }
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormat_NestedClassSelector(t *testing.T) {
+	src := []byte(`.parent{color:red;.child{font-size:14px;}}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+
+	expected := `.parent {
+  color: red;
+
+  .child {
+    font-size: 14px;
+  }
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormat_NestedAtRule(t *testing.T) {
+	src := []byte(`.parent{color:red;@media (hover){color:blue;}}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+
+	expected := `.parent {
+  color: red;
+
+  @media (hover) {
+    color: blue;
+  }
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormat_MultiLevelNesting(t *testing.T) {
+	src := []byte(`.a{.b{.c{color:red;}}}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+
+	expected := `.a {
+  .b {
+    .c {
+      color: red;
+    }
+  }
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormatCompact_NestedFallsBackToExpanded(t *testing.T) {
+	src := []byte(`.parent{color:red;&:hover{color:blue;}}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, compactOpts(80))
+	// Parent falls back to expanded due to nested rules;
+	// nested leaf rulesets may still be compacted.
+	expected := `.parent {
+  color: red;
+
+  &:hover { color: blue; }
+}
+`
+	if result != expected {
+		t.Errorf("got:\n%s\nwant:\n%s", result, expected)
+	}
+}
+
+func TestFormatPreserve_NestedFallsBackToExpanded(t *testing.T) {
+	src := []byte(`.parent { color: red; .child { font-size: 14px; } }`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, preserveOpts())
+	// Parent falls back to expanded due to nested rules;
+	// nested leaf rulesets keep original single-line layout.
+	expected := `.parent {
+  color: red;
+
+  .child { font-size: 14px; }
+}
+`
+	if result != expected {
+		t.Errorf("got:\n%s\nwant:\n%s", result, expected)
 	}
 }

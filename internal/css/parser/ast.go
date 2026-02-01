@@ -39,12 +39,25 @@ func (n *Stylesheet) Kind() NodeKind { return NodeStylesheet }
 func (n *Stylesheet) Offset() int    { return 0 }
 func (n *Stylesheet) End() int       { return n.EndPos }
 
-// Ruleset represents a CSS rule: selectors + declarations.
+// Ruleset represents a CSS rule: selectors + block children.
+// Children may contain Declaration, Ruleset (nested), AtRule,
+// and Comment nodes.
 type Ruleset struct {
-	Selectors    *SelectorList
-	Declarations []*Declaration
-	StartPos     int
-	EndPos       int
+	Selectors *SelectorList
+	Children  []Node
+	StartPos  int
+	EndPos    int
+}
+
+// Declarations returns only the Declaration children.
+func (n *Ruleset) Declarations() []*Declaration {
+	var decls []*Declaration
+	for _, child := range n.Children {
+		if d, ok := child.(*Declaration); ok {
+			decls = append(decls, d)
+		}
+	}
+	return decls
 }
 
 func (n *Ruleset) Kind() NodeKind { return NodeRuleset }

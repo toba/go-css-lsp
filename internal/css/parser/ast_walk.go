@@ -20,8 +20,8 @@ func Walk(node Node, visit Visitor) {
 		if n.Selectors != nil {
 			Walk(n.Selectors, visit)
 		}
-		for _, decl := range n.Declarations {
-			Walk(decl, visit)
+		for _, child := range n.Children {
+			Walk(child, visit)
 		}
 	case *SelectorList:
 		for _, sel := range n.Selectors {

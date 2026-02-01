@@ -53,7 +53,7 @@ func (a *diagAnalyzer) analyzeStylesheet(ss *parser.Stylesheet) {
 
 func (a *diagAnalyzer) analyzeRuleset(rs *parser.Ruleset) {
 	// Check for empty rulesets
-	if len(rs.Declarations) == 0 {
+	if len(rs.Children) == 0 {
 		line, char := OffsetToLineChar(
 			a.src, rs.Offset(),
 		)
@@ -72,8 +72,15 @@ func (a *diagAnalyzer) analyzeRuleset(rs *parser.Ruleset) {
 
 	seen := make(map[string]bool)
 
-	for _, decl := range rs.Declarations {
-		a.analyzeDeclaration(decl, seen)
+	for _, child := range rs.Children {
+		switch n := child.(type) {
+		case *parser.Declaration:
+			a.analyzeDeclaration(n, seen)
+		case *parser.Ruleset:
+			a.analyzeRuleset(n)
+		case *parser.AtRule:
+			a.analyzeAtRule(n)
+		}
 	}
 }
 
