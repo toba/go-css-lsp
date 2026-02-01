@@ -787,6 +787,8 @@ func processFormatting(
 			fmtOpts.Mode = analyzer.FormatCompact
 		case "preserve":
 			fmtOpts.Mode = analyzer.FormatPreserve
+		case "detect":
+			fmtOpts.Mode = analyzer.FormatDetect
 		}
 		fmtOpts.PrintWidth = storage.Settings.PrintWidth
 	}

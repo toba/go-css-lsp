@@ -109,18 +109,27 @@ func hoverAtKeyword(
 func hoverFunction(
 	tok *scanner.Token,
 ) (string, bool) {
-	// Check if it's a known function
-	name := tok.Value
-	desc := functionDescription(name)
-	if desc == "" {
+	name := strings.ToLower(tok.Value)
+	fn := data.LookupFunction(name)
+	if fn == nil {
 		return "", false
 	}
 
 	var b strings.Builder
-	b.WriteString("**")
-	b.WriteString(name)
-	b.WriteString("()**\n\n")
-	b.WriteString(desc)
+	b.WriteString("```\n")
+	for _, sig := range fn.Signatures {
+		b.WriteString(sig)
+		b.WriteString("\n")
+	}
+	b.WriteString("```\n\n")
+	b.WriteString(fn.Description)
+
+	if fn.MDN != "" {
+		b.WriteString("\n\n[MDN Reference](")
+		b.WriteString(fn.MDN)
+		b.WriteString(")")
+	}
+
 	return b.String(), true
 }
 
@@ -188,45 +197,4 @@ func hoverSelector(
 	})
 
 	return result, found
-}
-
-func functionDescription(name string) string {
-	switch strings.ToLower(name) {
-	case "calc":
-		return "Performs calculations to determine CSS property values."
-	case "var":
-		return "Inserts the value of a CSS custom property."
-	case "rgb", "rgba":
-		return "Specifies a color using red, green, blue (and alpha) values."
-	case "hsl", "hsla":
-		return "Specifies a color using hue, saturation, lightness (and alpha) values."
-	case "min":
-		return "Returns the smallest of the given values."
-	case "max":
-		return "Returns the largest of the given values."
-	case "clamp":
-		return "Clamps a value between a minimum and maximum."
-	case "url":
-		return "References a resource by URL."
-	case "linear-gradient":
-		return "Creates a linear gradient image."
-	case "radial-gradient":
-		return "Creates a radial gradient image."
-	case "conic-gradient":
-		return "Creates a conic gradient image."
-	case "env":
-		return "Inserts the value of a user-agent defined environment variable."
-	case "hwb":
-		return "Specifies a color using hue, whiteness, blackness values."
-	case "oklch":
-		return "Specifies a color in the OKLCH color space."
-	case "oklab":
-		return "Specifies a color in the OKLAB color space."
-	case "color-mix":
-		return "Mixes two colors in a given color space."
-	case "light-dark":
-		return "Returns one of two colors depending on the user's color scheme preference."
-	default:
-		return ""
-	}
 }

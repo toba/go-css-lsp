@@ -28,6 +28,14 @@ type PseudoElement struct {
 	Description string
 }
 
+// Function describes a CSS function.
+type Function struct {
+	Name        string
+	Description string
+	MDN         string
+	Signatures  []string // human-readable overloads
+}
+
 // LookupProperty returns the property definition or nil.
 func LookupProperty(name string) *Property {
 	p, ok := propertyMap[name]
@@ -110,5 +118,26 @@ func IsKnownPseudoClass(name string) bool {
 // pseudo-element.
 func IsKnownPseudoElement(name string) bool {
 	_, ok := pseudoElementMap[name]
+	return ok
+}
+
+// LookupFunction returns the function definition or nil.
+func LookupFunction(name string) *Function {
+	f, ok := functionMap[name]
+	if !ok {
+		return nil
+	}
+	return &f
+}
+
+// AllFunctions returns all known function definitions.
+func AllFunctions() []Function {
+	return Functions
+}
+
+// IsKnownFunction returns whether the name is a known CSS
+// function.
+func IsKnownFunction(name string) bool {
+	_, ok := functionMap[name]
 	return ok
 }
