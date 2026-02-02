@@ -27,12 +27,33 @@ var version = "dev"
 
 // workspaceStore holds the state for a workspace.
 type workspaceStore struct {
+	mu          sync.RWMutex
 	RootPath    string
 	RawFiles    map[string][]byte
 	ParsedFiles map[string]*parser.Stylesheet
 	VarIndex    *workspace.Index
 	Settings    *lsp.ServerSettings
 	LintOpts    analyzer.LintOptions
+}
+
+// getParsedFile returns the parsed stylesheet for a URI,
+// protected by a read lock.
+func (s *workspaceStore) getParsedFile(
+	uri string,
+) *parser.Stylesheet {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ParsedFiles[uri]
+}
+
+// getRawFile returns the raw source for a URI, protected by
+// a read lock.
+func (s *workspaceStore) getRawFile(
+	uri string,
+) []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.RawFiles[uri]
 }
 
 const serverName = "go-css-lsp"
@@ -371,7 +392,7 @@ func processHover(
 		return marshalNullResult(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -438,7 +459,7 @@ func processCompletion(
 		return marshalNullResult(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -511,7 +532,7 @@ func processDocumentColor(
 		return marshalEmptyArray(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -623,7 +644,7 @@ func processSelectionRange(
 		return marshalEmptyArray(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -700,7 +721,7 @@ func processPrepareRename(
 		return marshalNullResult(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -759,7 +780,7 @@ func processRename(
 		return marshalNullResult(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -831,7 +852,7 @@ func processFormatting(
 		return marshalEmptyArray(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -903,7 +924,7 @@ func processDocumentHighlight(
 		return marshalEmptyArray(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -964,7 +985,7 @@ func processFoldingRange(
 		return marshalEmptyArray(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -1021,7 +1042,7 @@ func processDocumentLink(
 		return marshalEmptyArray(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -1164,7 +1185,7 @@ func processCodeAction(
 	}
 
 	mu.Lock()
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	mu.Unlock()
 	if ss == nil {
 		result := css.Parse(src)
@@ -1243,7 +1264,7 @@ func processReferences(
 		return marshalEmptyArray(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -1304,7 +1325,7 @@ func processDefinition(
 		return marshalNullResult(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -1350,7 +1371,7 @@ func processDefinition(
 	}
 
 	def := defs[0]
-	targetSrc := storage.RawFiles[def.URI]
+	targetSrc := storage.getRawFile(def.URI)
 	if targetSrc == nil {
 		return marshalNullResult(req.JsonRpc, req.Id)
 	}
@@ -1415,7 +1436,7 @@ func processDocumentSymbol(
 		return marshalEmptyArray(req.JsonRpc, req.Id)
 	}
 
-	ss := storage.ParsedFiles[uri]
+	ss := storage.getParsedFile(uri)
 	if ss == nil {
 		result := css.Parse(src)
 		ss = result.Stylesheet
@@ -1494,6 +1515,8 @@ func getFileContent(
 		return content
 	}
 
+	storage.mu.RLock()
+	defer storage.mu.RUnlock()
 	return storage.RawFiles[uri]
 }
 
@@ -1555,6 +1578,17 @@ func processDiagnosticNotification(
 	textFromClient map[string][]byte,
 	muTextFromClient *sync.Mutex,
 ) {
+	defer func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
+			slog.Error("panic in diagnostic goroutine",
+				slog.Any("panic", r),
+				slog.String("stack", string(buf[:n])),
+			)
+		}
+	}()
+
 	rootURI, ok := <-rootPathNotification
 	if !ok {
 		return
@@ -1597,10 +1631,12 @@ func processDiagnosticNotification(
 		muTextFromClient.Unlock()
 
 		for uri, content := range filesToProcess {
-			storage.RawFiles[uri] = content
-
 			diags, ss := css.Diagnostics(content, storage.LintOpts)
+
+			storage.mu.Lock()
+			storage.RawFiles[uri] = content
 			storage.ParsedFiles[uri] = ss
+			storage.mu.Unlock()
 
 			// Update workspace variable index using
 			// pre-parsed stylesheet to avoid double-parse
