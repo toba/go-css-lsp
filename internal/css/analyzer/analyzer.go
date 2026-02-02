@@ -63,10 +63,25 @@ const (
 	DeprecatedError
 )
 
+// UnknownValueMode controls how unrecognized value keywords are
+// reported.
+type UnknownValueMode int
+
+const (
+	// UnknownValueWarn emits a warning diagnostic (default).
+	UnknownValueWarn UnknownValueMode = iota
+	// UnknownValueIgnore suppresses unknown value diagnostics.
+	UnknownValueIgnore
+	// UnknownValueError treats unknown values as errors.
+	UnknownValueError
+)
+
 // LintOptions configures analyzer behavior.
 type LintOptions struct {
-	Experimental ExperimentalMode
-	Deprecated   DeprecatedMode
+	Experimental     ExperimentalMode
+	Deprecated       DeprecatedMode
+	UnknownValues    UnknownValueMode
+	StrictColorNames bool
 }
 
 // Diagnostic represents a diagnostic message.

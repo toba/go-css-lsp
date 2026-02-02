@@ -196,7 +196,9 @@ func (f *formatter) writeSelector(sl *parser.SelectorList) {
 func (f *formatter) writeSingleSelector(sel *parser.Selector) {
 	for i, part := range sel.Parts {
 		if part.Combinator != "" && part.Combinator != " " {
-			f.buf.WriteByte(' ')
+			if i > 0 {
+				f.buf.WriteByte(' ')
+			}
 			f.buf.WriteString(part.Combinator)
 			f.buf.WriteByte(' ')
 		} else if i > 0 && part.Combinator == " " {
@@ -664,7 +666,9 @@ func (f *formatter) writeSingleSelectorTo(
 ) {
 	for i, part := range sel.Parts {
 		if part.Combinator != "" && part.Combinator != " " {
-			sb.WriteByte(' ')
+			if i > 0 {
+				sb.WriteByte(' ')
+			}
 			sb.WriteString(part.Combinator)
 			sb.WriteByte(' ')
 		} else if i > 0 && part.Combinator == " " {

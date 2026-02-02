@@ -63,6 +63,19 @@ func deprecatedModeFromString(s string) analyzer.DeprecatedMode {
 	}
 }
 
+// unknownValueModeFromString converts a setting string to
+// UnknownValueMode. Unrecognized values default to warn.
+func unknownValueModeFromString(s string) analyzer.UnknownValueMode {
+	switch s {
+	case "ignore":
+		return analyzer.UnknownValueIgnore
+	case "error":
+		return analyzer.UnknownValueError
+	default:
+		return analyzer.UnknownValueWarn
+	}
+}
+
 // TargetFileExtensions lists supported file extensions.
 var TargetFileExtensions = []string{"css"}
 
@@ -163,6 +176,10 @@ func main() {
 				storage.LintOpts.Deprecated = deprecatedModeFromString(
 					settings.DeprecatedFeatures,
 				)
+				storage.LintOpts.UnknownValues = unknownValueModeFromString(
+					settings.UnknownValues,
+				)
+				storage.LintOpts.StrictColorNames = settings.StrictColorNames
 			}
 			notifyTheRootPath(
 				rootPathNotification, rootURI,

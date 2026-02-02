@@ -676,6 +676,33 @@ func TestFormatDetect_SelectorListInlineExceedsWidth(t *testing.T) {
 	}
 }
 
+func TestFormatDetect_LeadingCombinatorInlineSelectorList(t *testing.T) {
+	// Selectors starting with > should not produce extra space
+	src := []byte(`.parent {
+  > header h1, > h1 {
+    margin: 0;
+  }
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := ".parent {\n  > header h1, > h1 {\n    margin: 0;\n  }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatCompact_LeadingCombinatorSingleLine(t *testing.T) {
+	src := []byte(`.parent {
+  > h1 { margin: 0; }
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, compactOpts(80))
+	expected := ".parent {\n  > h1 { margin: 0; }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
 // --- At-rule single-line tests ---
 
 func TestFormatDetect_AtRuleInlineFirstPropFits(t *testing.T) {

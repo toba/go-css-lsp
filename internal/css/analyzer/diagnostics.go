@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/toba/go-css-lsp/internal/css/data"
@@ -180,6 +181,9 @@ func (a *diagAnalyzer) analyzeDeclaration(
 	// Check for zero with units (e.g. 0px -> 0)
 	a.checkZeroWithUnit(decl)
 
+	// Check for unknown values
+	a.checkUnknownValues(decl)
+
 	// Check for !important usage
 	if decl.Important {
 		line, char := OffsetToLineChar(
@@ -256,6 +260,80 @@ func (a *diagAnalyzer) checkZeroWithUnit(
 			Severity:  SeverityHint,
 		})
 	}
+}
+
+func (a *diagAnalyzer) checkUnknownValues(
+	decl *parser.Declaration,
+) {
+	if a.opts.UnknownValues == UnknownValueIgnore {
+		return
+	}
+	if decl.Value == nil || len(decl.Value.Tokens) == 0 {
+		return
+	}
+
+	propName := decl.Property.Value
+	prop := data.LookupProperty(propName)
+	if prop == nil || len(prop.Values) == 0 {
+		return
+	}
+
+	// Skip if value contains var() or any function token
+	for _, tok := range decl.Value.Tokens {
+		if tok.Kind == scanner.Function {
+			return
+		}
+	}
+
+	// Build lookup set for property values
+	validValues := make(map[string]bool, len(prop.Values)+len(data.GlobalValues))
+	for _, v := range prop.Values {
+		validValues[v] = true
+	}
+	for _, v := range data.GlobalValues {
+		validValues[v] = true
+	}
+
+	sev := SeverityWarning
+	if a.opts.UnknownValues == UnknownValueError {
+		sev = SeverityError
+	}
+
+	for _, tok := range decl.Value.Tokens {
+		if tok.Kind != scanner.Ident {
+			continue
+		}
+		val := strings.ToLower(tok.Value)
+		if validValues[val] {
+			continue
+		}
+		// In lenient color mode, accept named colors
+		// for any property
+		if !a.opts.StrictColorNames && isNamedColor(val) {
+			continue
+		}
+		line, char := OffsetToLineChar(
+			a.src, tok.Offset,
+		)
+		endLine, endChar := OffsetToLineChar(
+			a.src, tok.End,
+		)
+		a.diags = append(a.diags, Diagnostic{
+			Message: UnknownValueMessage(
+				tok.Value, propName,
+			),
+			StartLine: line,
+			StartChar: char,
+			EndLine:   endLine,
+			EndChar:   endChar,
+			Severity:  sev,
+		})
+	}
+}
+
+// isNamedColor returns true if the value is a CSS named color.
+func isNamedColor(val string) bool {
+	return slices.Contains(data.NamedColors, val)
 }
 
 func (a *diagAnalyzer) analyzeAtRule(rule *parser.AtRule) {

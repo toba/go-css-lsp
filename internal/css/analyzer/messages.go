@@ -45,3 +45,10 @@ func ExperimentalPropertyMessage(name string) string {
 func DeprecatedPropertyMessage(name string) string {
 	return "deprecated property '" + name + "'"
 }
+
+// UnknownValueMessage returns a diagnostic message for an
+// unrecognized value keyword.
+func UnknownValueMessage(value, property string) string {
+	return "unknown value '" + value +
+		"' for property '" + property + "'"
+}

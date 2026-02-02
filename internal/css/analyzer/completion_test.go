@@ -141,6 +141,38 @@ func TestCompleteNotInString(t *testing.T) {
 	}
 }
 
+func TestCompleteValueContext(t *testing.T) {
+	src := []byte("body { justify-content: ; }")
+	ss, _ := parser.Parse(src)
+
+	// offset 23 is after "justify-content: " (right before ;)
+	items := Complete(ss, src, 23, LintOptions{})
+
+	// Should include value keywords like center, space-between
+	hasCenter := false
+	hasPropertyKind := false
+	for _, item := range items {
+		if item.Label == "center" {
+			hasCenter = true
+		}
+		if item.Kind == KindProperty {
+			hasPropertyKind = true
+		}
+	}
+	if !hasCenter {
+		t.Error(
+			"expected 'center' in value completions for " +
+				"justify-content",
+		)
+	}
+	if hasPropertyKind {
+		t.Error(
+			"property completions should not appear " +
+				"in value context",
+		)
+	}
+}
+
 func TestCompleteDeprecatedPropertyTagged(t *testing.T) {
 	src := []byte("body { cli }")
 	ss, _ := parser.Parse(src)
