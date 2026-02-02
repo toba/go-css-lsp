@@ -1,4 +1,4 @@
-// Package scanner implements a CSS3 tokenizer per W3C CSS Syntax
+// Package scanner implements a CSS tokenizer per W3C CSS Syntax
 // Module Level 3.
 package scanner
 

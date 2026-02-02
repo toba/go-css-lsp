@@ -1,4 +1,4 @@
-// Package parser implements a recursive descent CSS3 parser.
+// Package parser implements a recursive descent CSS parser.
 package parser
 
 import (

@@ -119,6 +119,7 @@ func main() {
 	textChangedNotification := make(chan bool, 2)
 	textFromClient := make(map[string][]byte)
 	muTextFromClient := new(sync.Mutex)
+	muStdout := new(sync.Mutex)
 
 	go processDiagnosticNotification(
 		storage,
@@ -126,6 +127,7 @@ func main() {
 		textChangedNotification,
 		textFromClient,
 		muTextFromClient,
+		muStdout,
 	)
 
 	var request lsp.RequestMessage[any]
@@ -150,7 +152,9 @@ func main() {
 			response, _ = lsp.ProcessIllegalRequestAfterShutdown(
 				request.JsonRpc, request.Id,
 			)
+			muStdout.Lock()
 			lsp.SendToLspClient(os.Stdout, response)
+			muStdout.Unlock()
 			continue
 		}
 
@@ -171,7 +175,9 @@ func main() {
 		}
 
 		if isRequestResponse {
+			muStdout.Lock()
 			lsp.SendToLspClient(os.Stdout, response)
+			muStdout.Unlock()
 		}
 	}
 
@@ -1586,6 +1592,7 @@ func processDiagnosticNotification(
 	textChangedNotification chan bool,
 	textFromClient map[string][]byte,
 	muTextFromClient *sync.Mutex,
+	muStdout *sync.Mutex,
 ) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1663,7 +1670,9 @@ func processDiagnosticNotification(
 				continue
 			}
 
+			muStdout.Lock()
 			lsp.SendToLspClient(os.Stdout, out)
+			muStdout.Unlock()
 		}
 	}
 }

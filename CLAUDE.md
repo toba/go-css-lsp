@@ -1,6 +1,6 @@
 # Go CSS LSP
 
-Language Server Protocol implementation for CSS3 (CSS3 only — no SCSS, Sass, or LESS support).
+Language Server Protocol implementation for modern, pure CSS (no SCSS, Sass, or LESS support).
 
 ## Reference Projects
 
@@ -11,7 +11,7 @@ Language Server Protocol implementation for CSS3 (CSS3 only — no SCSS, Sass, o
 ## Guidelines
 
 - Be concise
-- CSS3 support only — no SCSS, Sass, or LESS
+- Modern, pure CSS only — no SCSS, Sass, or LESS
 - When fixing or investigating code issues, ALWAYS create a failing test FIRST to demonstrate understanding of the problem THEN change code and confirm the test passes
 - Run `golangci-lint run --fix` after modifying Go code
 - Run `go test ./...` after changes
