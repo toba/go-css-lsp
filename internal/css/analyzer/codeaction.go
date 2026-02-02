@@ -1,6 +1,8 @@
 package analyzer
 
 import (
+	"cmp"
+	"slices"
 	"strings"
 
 	"github.com/toba/go-css-lsp/internal/css/data"
@@ -94,15 +96,9 @@ func findSimilarProperties(name string) []string {
 		}
 	}
 
-	// Sort by score (simple selection sort, list is small)
-	for i := range candidates {
-		for j := i + 1; j < len(candidates); j++ {
-			if candidates[j].score < candidates[i].score {
-				candidates[i], candidates[j] =
-					candidates[j], candidates[i]
-			}
-		}
-	}
+	slices.SortFunc(candidates, func(a, b scored) int {
+		return cmp.Compare(a.score, b.score)
+	})
 
 	limit := min(len(candidates), 3)
 

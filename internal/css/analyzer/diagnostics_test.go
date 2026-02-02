@@ -461,6 +461,74 @@ func TestAnalyzeUnknownValue_Animation(t *testing.T) {
 	}
 }
 
+func TestAnalyzeUnknownValue_OutlineNone(t *testing.T) {
+	src := []byte(`body { outline: none; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	if _, ok := findDiagnostic(
+		diags,
+		UnknownValueMessage("none", "outline"),
+	); ok {
+		t.Error("'none' is a valid value for outline")
+	}
+}
+
+func TestAnalyzeUnknownValue_PointerEventsAuto(t *testing.T) {
+	src := []byte(`body { pointer-events: auto; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	if _, ok := findDiagnostic(
+		diags,
+		UnknownValueMessage("auto", "pointer-events"),
+	); ok {
+		t.Error("'auto' is a valid value for pointer-events")
+	}
+}
+
+func TestAnalyzeUnknownValue_GridAreaIdent(t *testing.T) {
+	src := []byte(`body { grid-area: header; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	if _, ok := findDiagnostic(
+		diags,
+		UnknownValueMessage("header", "grid-area"),
+	); ok {
+		t.Error("grid-area should accept arbitrary grid line names")
+	}
+}
+
+func TestAnalyzeUnknownValue_FontFamily(t *testing.T) {
+	src := []byte(
+		`body { font-family: system-ui, -apple-system, Roboto, sans-serif; }`,
+	)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	for _, d := range diags {
+		if d.Message == UnknownValueMessage("system-ui", "font-family") ||
+			d.Message == UnknownValueMessage("-apple-system", "font-family") ||
+			d.Message == UnknownValueMessage("Roboto", "font-family") {
+			t.Errorf("font-family should accept arbitrary font names: %s", d.Message)
+		}
+	}
+}
+
+func TestAnalyzeUnknownValue_FontFamilyGeneric(t *testing.T) {
+	src := []byte(`body { font-family: monospace; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	if _, ok := findDiagnostic(
+		diags,
+		UnknownValueMessage("monospace", "font-family"),
+	); ok {
+		t.Error("'monospace' should be valid for font-family")
+	}
+}
+
 func TestAnalyzeDeprecatedProperty_Warn(t *testing.T) {
 	src := []byte(`div { clip: rect(0, 0, 0, 0); }`)
 	ss := parseCSS(t, src)

@@ -37,42 +37,16 @@ type workspaceStore struct {
 
 const serverName = "go-css-lsp"
 
-// experimentalModeFromString converts a setting string to
-// ExperimentalMode. Unrecognized values default to warn.
-func experimentalModeFromString(s string) analyzer.ExperimentalMode {
+// modeFromString converts a setting string to a mode enum.
+// Unrecognized values default to warn.
+func modeFromString[T ~int](s string, ignore, err, warn T) T {
 	switch s {
 	case "ignore":
-		return analyzer.ExperimentalIgnore
+		return ignore
 	case "error":
-		return analyzer.ExperimentalError
+		return err
 	default:
-		return analyzer.ExperimentalWarn
-	}
-}
-
-// deprecatedModeFromString converts a setting string to
-// DeprecatedMode. Unrecognized values default to warn.
-func deprecatedModeFromString(s string) analyzer.DeprecatedMode {
-	switch s {
-	case "ignore":
-		return analyzer.DeprecatedIgnore
-	case "error":
-		return analyzer.DeprecatedError
-	default:
-		return analyzer.DeprecatedWarn
-	}
-}
-
-// unknownValueModeFromString converts a setting string to
-// UnknownValueMode. Unrecognized values default to warn.
-func unknownValueModeFromString(s string) analyzer.UnknownValueMode {
-	switch s {
-	case "ignore":
-		return analyzer.UnknownValueIgnore
-	case "error":
-		return analyzer.UnknownValueError
-	default:
-		return analyzer.UnknownValueWarn
+		return warn
 	}
 }
 
@@ -170,14 +144,23 @@ func main() {
 			)
 			storage.Settings = settings
 			if settings != nil {
-				storage.LintOpts.Experimental = experimentalModeFromString(
+				storage.LintOpts.Experimental = modeFromString(
 					settings.ExperimentalFeatures,
+					analyzer.ExperimentalIgnore,
+					analyzer.ExperimentalError,
+					analyzer.ExperimentalWarn,
 				)
-				storage.LintOpts.Deprecated = deprecatedModeFromString(
+				storage.LintOpts.Deprecated = modeFromString(
 					settings.DeprecatedFeatures,
+					analyzer.DeprecatedIgnore,
+					analyzer.DeprecatedError,
+					analyzer.DeprecatedWarn,
 				)
-				storage.LintOpts.UnknownValues = unknownValueModeFromString(
+				storage.LintOpts.UnknownValues = modeFromString(
 					settings.UnknownValues,
+					analyzer.UnknownValueIgnore,
+					analyzer.UnknownValueError,
+					analyzer.UnknownValueWarn,
 				)
 				storage.LintOpts.StrictColorNames = settings.StrictColorNames
 			}

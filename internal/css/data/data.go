@@ -4,62 +4,48 @@ package data
 
 //go:generate go run ../../../cmd/generate-data
 
+// StatusInfo holds the status field shared by all CSS data
+// types, providing common status-checking methods.
+type StatusInfo struct{ Status string }
+
+// IsDeprecated returns true for obsolete entries.
+func (s StatusInfo) IsDeprecated() bool { return s.Status == "obsolete" }
+
+// IsExperimental returns true for experimental entries.
+func (s StatusInfo) IsExperimental() bool { return s.Status == "experimental" }
+
+// IsNonstandard returns true for nonstandard entries.
+func (s StatusInfo) IsNonstandard() bool { return s.Status == "nonstandard" }
+
 // Property describes a CSS property.
 type Property struct {
 	Name        string
 	Description string
 	MDN         string
 	Values      []string // common value keywords
-	Status      string   // "obsolete", "experimental", "nonstandard", or "" (standard)
+	StatusInfo
 }
-
-// IsDeprecated returns true for obsolete properties.
-func (p *Property) IsDeprecated() bool { return p.Status == "obsolete" }
-
-// IsExperimental returns true for experimental properties.
-func (p *Property) IsExperimental() bool { return p.Status == "experimental" }
-
-// IsNonstandard returns true for nonstandard properties.
-func (p *Property) IsNonstandard() bool { return p.Status == "nonstandard" }
 
 // AtRuleDef describes a CSS at-rule.
 type AtRuleDef struct {
 	Name        string
 	Description string
-	Status      string
+	StatusInfo
 }
-
-// IsExperimental returns true for experimental at-rules.
-func (a AtRuleDef) IsExperimental() bool { return a.Status == "experimental" }
-
-// IsDeprecated returns true for obsolete at-rules.
-func (a AtRuleDef) IsDeprecated() bool { return a.Status == "obsolete" }
 
 // PseudoClass describes a CSS pseudo-class.
 type PseudoClass struct {
 	Name        string
 	Description string
-	Status      string
+	StatusInfo
 }
-
-// IsExperimental returns true for experimental pseudo-classes.
-func (p PseudoClass) IsExperimental() bool { return p.Status == "experimental" }
-
-// IsDeprecated returns true for obsolete pseudo-classes.
-func (p PseudoClass) IsDeprecated() bool { return p.Status == "obsolete" }
 
 // PseudoElement describes a CSS pseudo-element.
 type PseudoElement struct {
 	Name        string
 	Description string
-	Status      string
+	StatusInfo
 }
-
-// IsExperimental returns true for experimental pseudo-elements.
-func (p PseudoElement) IsExperimental() bool { return p.Status == "experimental" }
-
-// IsDeprecated returns true for obsolete pseudo-elements.
-func (p PseudoElement) IsDeprecated() bool { return p.Status == "obsolete" }
 
 // Function describes a CSS function.
 type Function struct {

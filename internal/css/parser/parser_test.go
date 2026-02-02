@@ -450,3 +450,94 @@ func TestParseFunctionValue(t *testing.T) {
 		)
 	}
 }
+
+func TestUnclosedBlock(t *testing.T) {
+	// EOF inside block — should recover gracefully
+	src := `body { color: red;`
+	ss, _ := Parse([]byte(src))
+
+	if len(ss.Children) == 0 {
+		t.Fatal("expected partial AST after unclosed block")
+	}
+}
+
+func TestUnclosedAtRule(t *testing.T) {
+	// EOF inside at-rule block
+	src := `@media (max-width: 600px) { body { color: red; }`
+	ss, _ := Parse([]byte(src))
+
+	if len(ss.Children) == 0 {
+		t.Fatal("expected partial AST after unclosed at-rule")
+	}
+	at, ok := ss.Children[0].(*AtRule)
+	if !ok {
+		t.Fatalf("expected AtRule, got %T", ss.Children[0])
+	}
+	if at.Name != "media" {
+		t.Errorf("expected 'media', got %q", at.Name)
+	}
+}
+
+func TestMissingPropertyName(t *testing.T) {
+	// Declaration error recovery: missing property name
+	src := `body { : red; color: blue; }`
+	ss, _ := Parse([]byte(src))
+
+	if len(ss.Children) == 0 {
+		t.Fatal("expected partial AST")
+	}
+	_, ok := ss.Children[0].(*Ruleset)
+	if !ok {
+		t.Fatalf("expected Ruleset, got %T", ss.Children[0])
+	}
+}
+
+func TestMissingColon(t *testing.T) {
+	// Declaration error recovery: missing colon
+	src := `body { color red; font-size: 16px; }`
+	ss, _ := Parse([]byte(src))
+
+	if len(ss.Children) == 0 {
+		t.Fatal("expected partial AST")
+	}
+}
+
+func TestNestedFunctionValues(t *testing.T) {
+	src := `div { width: calc(100% - (50px + 10px)); }`
+	ss, errs := Parse([]byte(src))
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	rs := ss.Children[0].(*Ruleset)
+	decls := rs.Declarations()
+	if len(decls) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(decls))
+	}
+	if decls[0].Property.Value != "width" {
+		t.Errorf(
+			"expected 'width', got %q",
+			decls[0].Property.Value,
+		)
+	}
+}
+
+func TestCommentsBetweenDeclarations(t *testing.T) {
+	src := `body {
+  color: red;
+  /* separator */
+  font-size: 16px;
+}`
+	ss, errs := Parse([]byte(src))
+
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	rs := ss.Children[0].(*Ruleset)
+	decls := rs.Declarations()
+	if len(decls) != 2 {
+		t.Fatalf("expected 2 declarations, got %d", len(decls))
+	}
+}

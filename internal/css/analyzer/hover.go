@@ -191,36 +191,13 @@ func hoverVarReference(
 	resolver VariableResolver,
 ) HoverResult {
 	tokens := decl.Value.Tokens
-	for i, t := range tokens {
-		if t.Kind != scanner.Function ||
-			strings.ToLower(t.Value) != VarFunctionName {
-			continue
-		}
-		// Find the ident token inside this var()
-		for j := i + 1; j < len(tokens); j++ {
-			if tokens[j].Kind == scanner.Whitespace {
-				continue
-			}
-			if tokens[j].Kind == scanner.Ident &&
-				IsCustomProperty(tokens[j].Value) &&
-				tokens[j].Offset == tok.Offset {
-				// Found a match — build the range from
-				// var( to closing )
-				varStart := t.Offset
-				varEnd := tokens[j].End
-				for k := j + 1; k < len(tokens); k++ {
-					if tokens[k].Kind == scanner.ParenClose {
-						varEnd = tokens[k].End
-						break
-					}
-				}
-				return hoverCustomProperty(
-					ss, src, tok.Value,
-					varStart, varEnd,
-					resolver,
-				)
-			}
-			break
+	for _, ref := range findVarRefs(tokens) {
+		if tokens[ref.identIdx].Offset == tok.Offset {
+			return hoverCustomProperty(
+				ss, src, tok.Value,
+				ref.varStart, ref.varEnd,
+				resolver,
+			)
 		}
 	}
 	return HoverResult{}
@@ -244,32 +221,14 @@ func hoverVarFunction(
 	}
 
 	tokens := decl.Value.Tokens
-	for i, t := range tokens {
-		if t.Offset != funcTok.Offset {
-			continue
-		}
-		// Find ident inside this var()
-		for j := i + 1; j < len(tokens); j++ {
-			if tokens[j].Kind == scanner.Whitespace {
-				continue
-			}
-			if tokens[j].Kind == scanner.Ident &&
-				IsCustomProperty(tokens[j].Value) {
-				varStart := t.Offset
-				varEnd := tokens[j].End
-				for k := j + 1; k < len(tokens); k++ {
-					if tokens[k].Kind == scanner.ParenClose {
-						varEnd = tokens[k].End
-						break
-					}
-				}
-				return hoverCustomProperty(
-					ss, src, tokens[j].Value,
-					varStart, varEnd,
-					resolver,
-				)
-			}
-			break
+	for _, ref := range findVarRefs(tokens) {
+		if tokens[ref.funcIdx].Offset == funcTok.Offset {
+			return hoverCustomProperty(
+				ss, src,
+				tokens[ref.identIdx].Value,
+				ref.varStart, ref.varEnd,
+				resolver,
+			)
 		}
 	}
 	return HoverResult{}

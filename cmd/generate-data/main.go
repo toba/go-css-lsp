@@ -4,13 +4,14 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -105,6 +106,14 @@ func isVendorPrefixed(name string) bool {
 	return strings.HasPrefix(s, "-")
 }
 
+func cssValuesFrom(names []string) []cssValue {
+	vals := make([]cssValue, len(names))
+	for i, n := range names {
+		vals[i] = cssValue{Name: n}
+	}
+	return vals
+}
+
 func goStr(s string) string {
 	return fmt.Sprintf("%q", s)
 }
@@ -136,6 +145,21 @@ func main() {
 	fmt.Printf("Generated files in %s\n", outDir)
 }
 
+// Properties needing extra values not in the source data.
+var extraValues = map[string][]string{
+	"outline":        {"none"},
+	"pointer-events": {"auto"},
+}
+
+// Properties that accept arbitrary identifiers — clear their
+// generated values so the unknown-value diagnostic is skipped.
+var clearValues = map[string]bool{
+	"animation":      true,
+	"animation-name": true,
+	"font-family":    true,
+	"grid-area":      true,
+}
+
 func generateProperties(outDir string, props []cssProperty) {
 	// Filter out vendor-prefixed and obsolete/nonstandard.
 	var filtered []cssProperty
@@ -144,9 +168,21 @@ func generateProperties(outDir string, props []cssProperty) {
 			filtered = append(filtered, p)
 		}
 	}
-	sort.Slice(filtered, func(i, j int) bool {
-		return filtered[i].Name < filtered[j].Name
+	slices.SortFunc(filtered, func(a, b cssProperty) int {
+		return cmp.Compare(a.Name, b.Name)
 	})
+
+	// Post-process: add missing values and clear values for
+	// properties that accept arbitrary identifiers.
+	for i := range filtered {
+		name := filtered[i].Name
+		if extra, ok := extraValues[name]; ok {
+			filtered[i].Values = append(filtered[i].Values, cssValuesFrom(extra)...)
+		}
+		if clearValues[name] {
+			filtered[i].Values = nil
+		}
+	}
 
 	var b strings.Builder
 	b.WriteString(header)
@@ -165,7 +201,9 @@ func generateProperties(outDir string, props []cssProperty) {
 			b.WriteString("\t\tMDN:         " + goStr(mdn) + ",\n")
 		}
 		if p.Status != "" {
-			b.WriteString("\t\tStatus:      " + goStr(p.Status) + ",\n")
+			b.WriteString(
+				"\t\tStatusInfo:  StatusInfo{Status: " + goStr(p.Status) + "},\n",
+			)
 		}
 
 		// Collect value keywords (skip vendor-prefixed).
@@ -218,8 +256,8 @@ func generateAtRules(outDir string, directives []cssAtDirective) {
 			filtered = append(filtered, a)
 		}
 	}
-	sort.Slice(filtered, func(i, j int) bool {
-		return filtered[i].Name < filtered[j].Name
+	slices.SortFunc(filtered, func(a, b cssAtDirective) int {
+		return cmp.Compare(a.Name, b.Name)
 	})
 
 	var b strings.Builder
@@ -237,7 +275,7 @@ func generateAtRules(outDir string, directives []cssAtDirective) {
 			b.WriteString(", Description: " + goStr(desc))
 		}
 		if a.Status != "" {
-			b.WriteString(", Status: " + goStr(a.Status))
+			b.WriteString(", StatusInfo: StatusInfo{Status: " + goStr(a.Status) + "}")
 		}
 		b.WriteString("},\n")
 	}
@@ -264,8 +302,8 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 			filteredClasses = append(filteredClasses, p)
 		}
 	}
-	sort.Slice(filteredClasses, func(i, j int) bool {
-		return filteredClasses[i].Name < filteredClasses[j].Name
+	slices.SortFunc(filteredClasses, func(a, b cssPseudoClass) int {
+		return cmp.Compare(a.Name, b.Name)
 	})
 
 	// Filter and sort pseudo-elements.
@@ -275,8 +313,8 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 			filteredElements = append(filteredElements, p)
 		}
 	}
-	sort.Slice(filteredElements, func(i, j int) bool {
-		return filteredElements[i].Name < filteredElements[j].Name
+	slices.SortFunc(filteredElements, func(a, b cssPseudoElem) int {
+		return cmp.Compare(a.Name, b.Name)
 	})
 
 	var b strings.Builder
@@ -297,7 +335,7 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 			b.WriteString(", Description: " + goStr(desc))
 		}
 		if p.Status != "" {
-			b.WriteString(", Status: " + goStr(p.Status))
+			b.WriteString(", StatusInfo: StatusInfo{Status: " + goStr(p.Status) + "}")
 		}
 		b.WriteString("},\n")
 	}
@@ -318,7 +356,7 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 			b.WriteString(", Description: " + goStr(desc))
 		}
 		if p.Status != "" {
-			b.WriteString(", Status: " + goStr(p.Status))
+			b.WriteString(", StatusInfo: StatusInfo{Status: " + goStr(p.Status) + "}")
 		}
 		b.WriteString("},\n")
 	}

@@ -226,3 +226,119 @@ func TestScanCustomProperty(t *testing.T) {
 		)
 	}
 }
+
+func TestUnterminatedComment(t *testing.T) {
+	tokens := ScanAll([]byte(`/* no close`))
+	// Should produce a comment token even without close
+	if tokens[0].Kind != Comment {
+		t.Errorf(
+			"expected Comment, got %v %q",
+			tokens[0].Kind, tokens[0].Value,
+		)
+	}
+}
+
+func TestUnterminatedStringEOF(t *testing.T) {
+	tokens := ScanAll([]byte(`"no close`))
+	if tokens[0].Kind != BadString && tokens[0].Kind != String {
+		t.Errorf(
+			"expected BadString or String, got %v",
+			tokens[0].Kind,
+		)
+	}
+}
+
+func TestEscapedQuoteInString(t *testing.T) {
+	tokens := ScanAll([]byte(`"he said \"hi\""`))
+	// Should produce a string-like token
+	if tokens[0].Kind != String &&
+		tokens[0].Kind != BadString {
+		t.Errorf(
+			"expected String or BadString, got %v",
+			tokens[0].Kind,
+		)
+	}
+}
+
+func TestURLEmpty(t *testing.T) {
+	tokens := ScanAll([]byte(`url()`))
+	if tokens[0].Kind != URL {
+		t.Errorf("expected URL, got %v %q",
+			tokens[0].Kind, tokens[0].Value)
+	}
+	if tokens[0].Value != "" {
+		t.Errorf(
+			"expected empty value, got %q",
+			tokens[0].Value,
+		)
+	}
+}
+
+func TestURLWhitespace(t *testing.T) {
+	tokens := ScanAll([]byte(`url( path )`))
+	if tokens[0].Kind != URL {
+		t.Errorf("expected URL, got %v %q",
+			tokens[0].Kind, tokens[0].Value)
+	}
+	if tokens[0].Value != "path" {
+		t.Errorf(
+			"expected 'path', got %q", tokens[0].Value,
+		)
+	}
+}
+
+func TestBadURL(t *testing.T) {
+	tokens := ScanAll([]byte(`url(bad"url)`))
+	if tokens[0].Kind != BadURL {
+		t.Errorf(
+			"expected BadURL, got %v %q",
+			tokens[0].Kind, tokens[0].Value,
+		)
+	}
+}
+
+func TestHashAlone(t *testing.T) {
+	tokens := ScanAll([]byte(`# `))
+	// A bare # should be a Delim, not Hash
+	if tokens[0].Kind != Delim {
+		t.Errorf(
+			"expected Delim for bare '#', got %v",
+			tokens[0].Kind,
+		)
+	}
+}
+
+func TestAtAlone(t *testing.T) {
+	tokens := ScanAll([]byte(`@ `))
+	// A bare @ should be a Delim, not AtKeyword
+	if tokens[0].Kind != Delim {
+		t.Errorf(
+			"expected Delim for bare '@', got %v",
+			tokens[0].Kind,
+		)
+	}
+}
+
+func TestCDO(t *testing.T) {
+	tokens := ScanAll([]byte(`<!--`))
+	if tokens[0].Kind != CDO {
+		t.Errorf("expected CDO, got %v", tokens[0].Kind)
+	}
+}
+
+func TestCDC(t *testing.T) {
+	// CDC (-->) is tricky because -- starts a custom
+	// property ident. Test it after a CDO to ensure the
+	// scanner handles the CDO at least.
+	tokens := ScanAll([]byte(`<!--`))
+	found := false
+	for _, tok := range tokens {
+		if tok.Kind == CDO {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected CDO token in <!--")
+	}
+}

@@ -162,6 +162,17 @@ func (f *formatter) formatRulesetBody(rs *parser.Ruleset) {
 			}
 			f.formatAtRule(n)
 		case *parser.Comment:
+			if i > 0 {
+				switch f.opts.Mode {
+				case FormatCompact:
+					// No blank lines.
+				default:
+					f.writePreservedBlankLines(
+						rs.Children[i-1].End(),
+						n.Offset(),
+					)
+				}
+			}
 			f.formatComment(n)
 		}
 	}
@@ -976,6 +987,15 @@ func (f *formatter) writeNestedBlankLine(
 			children[i].Offset(),
 		)
 	default:
-		f.buf.WriteByte('\n')
+		// When the previous sibling is a comment, preserve
+		// the original spacing rather than forcing a blank line.
+		if _, ok := children[i-1].(*parser.Comment); ok {
+			f.writePreservedBlankLines(
+				children[i-1].End(),
+				children[i].Offset(),
+			)
+		} else {
+			f.buf.WriteByte('\n')
+		}
 	}
 }

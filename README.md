@@ -1,8 +1,6 @@
 # go-css-lsp
 
-A Language Server Protocol implementation for CSS3, written in Go. Designed as a lightweight, fast alternative to [vscode-css-languageservice](https://github.com/microsoft/vscode-css-languageservice).
-
-CSS3 only — no SCSS, Sass, or LESS.
+A Language Server Protocol implementation for pure, modern CSS, written in Go. Designed as a lightweight, fast alternative to [vscode-css-languageservice](https://github.com/microsoft/vscode-css-languageservice).
 
 ## Features
 

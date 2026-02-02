@@ -18,6 +18,57 @@ func IsCustomProperty(name string) bool {
 	return strings.HasPrefix(name, CustomPropertyPrefix)
 }
 
+// varRef describes a var(--name) reference found in tokens.
+type varRef struct {
+	// identIdx is the index of the --custom-property ident
+	// token in the token slice.
+	identIdx int
+	// funcIdx is the index of the var( function token.
+	funcIdx int
+	// varStart is the byte offset of the var( token.
+	varStart int
+	// varEnd is the byte offset past the closing paren (or
+	// the ident end if no paren found).
+	varEnd int
+}
+
+// findVarRefs finds all var(--name) references in a token
+// slice. For each var() call with a custom property ident, it
+// records the function token index, ident token index, and the
+// full byte range from var( to the closing ).
+func findVarRefs(tokens []scanner.Token) []varRef {
+	var refs []varRef
+	for i, tok := range tokens {
+		if tok.Kind != scanner.Function ||
+			strings.ToLower(tok.Value) != VarFunctionName {
+			continue
+		}
+		for j := i + 1; j < len(tokens); j++ {
+			if tokens[j].Kind == scanner.Whitespace {
+				continue
+			}
+			if tokens[j].Kind == scanner.Ident &&
+				IsCustomProperty(tokens[j].Value) {
+				varEnd := tokens[j].End
+				for k := j + 1; k < len(tokens); k++ {
+					if tokens[k].Kind == scanner.ParenClose {
+						varEnd = tokens[k].End
+						break
+					}
+				}
+				refs = append(refs, varRef{
+					identIdx: j,
+					funcIdx:  i,
+					varStart: tok.Offset,
+					varEnd:   varEnd,
+				})
+			}
+			break
+		}
+	}
+	return refs
+}
+
 // FindCustomPropertyAt determines the custom property name at
 // the cursor position. Works on both declarations and var()
 // usages.
@@ -52,31 +103,11 @@ func FindCustomPropertyAt(
 		}
 
 		tokens := decl.Value.Tokens
-		for i, tok := range tokens {
-			if tok.Kind == scanner.Function &&
-				strings.ToLower(tok.Value) == VarFunctionName {
-				for j := i + 1; j < len(tokens); j++ {
-					if tokens[j].Kind == scanner.Whitespace {
-						continue
-					}
-					if tokens[j].Kind == scanner.Ident &&
-						IsCustomProperty(tokens[j].Value) {
-						// Check if cursor is in var(...) range
-						varEnd := tokens[j].End
-						for k := j + 1; k < len(tokens); k++ {
-							if tokens[k].Kind == scanner.ParenClose {
-								varEnd = tokens[k].End
-								break
-							}
-						}
-						if offset >= tok.Offset &&
-							offset <= varEnd {
-							result = tokens[j].Value
-							return false
-						}
-					}
-					break
-				}
+		for _, ref := range findVarRefs(tokens) {
+			if offset >= ref.varStart &&
+				offset <= ref.varEnd {
+				result = tokens[ref.identIdx].Value
+				return false
 			}
 		}
 
@@ -110,49 +141,25 @@ func FindVarReferenceAt(
 		}
 
 		tokens := decl.Value.Tokens
-		for i, tok := range tokens {
-			// Check if cursor is on a var() function call
-			if tok.Kind == scanner.Function &&
-				strings.ToLower(tok.Value) == VarFunctionName {
-				for j := i + 1; j < len(tokens); j++ {
-					if tokens[j].Kind == scanner.Whitespace {
-						continue
-					}
-					if tokens[j].Kind == scanner.Ident &&
-						IsCustomProperty(tokens[j].Value) {
-						varStart := tok.Offset
-						varEnd := tokens[j].End
-						for k := j + 1; k < len(tokens); k++ {
-							if tokens[k].Kind == scanner.ParenClose {
-								varEnd = tokens[k].End
-								break
-							}
-						}
-						if offset >= varStart && offset <= varEnd {
-							result = tokens[j].Value
-							return false
-						}
-					}
-					break
-				}
+		for _, ref := range findVarRefs(tokens) {
+			if offset >= ref.varStart &&
+				offset <= ref.varEnd {
+				result = tokens[ref.identIdx].Value
+				return false
 			}
+		}
 
-			// Check if cursor is directly on a --variable ident
-			// inside a var()
+		// Check if cursor is directly on a --variable ident
+		// inside a var()
+		for _, tok := range tokens {
 			if tok.Kind == scanner.Ident &&
 				IsCustomProperty(tok.Value) &&
 				offset >= tok.Offset && offset <= tok.End {
-				if i > 0 {
-					for k := i - 1; k >= 0; k-- {
-						if tokens[k].Kind == scanner.Whitespace {
-							continue
-						}
-						if tokens[k].Kind == scanner.Function &&
-							strings.ToLower(tokens[k].Value) == VarFunctionName {
-							result = tok.Value
-							return false
-						}
-						break
+				for _, ref := range findVarRefs(tokens) {
+					if ref.identIdx >= 0 &&
+						tokens[ref.identIdx].Offset == tok.Offset {
+						result = tok.Value
+						return false
 					}
 				}
 			}
@@ -185,60 +192,28 @@ func FindVarReferenceWithRange(
 		}
 
 		tokens := decl.Value.Tokens
-		for i, tok := range tokens {
-			if tok.Kind == scanner.Function &&
-				strings.ToLower(tok.Value) == VarFunctionName {
-				for j := i + 1; j < len(tokens); j++ {
-					if tokens[j].Kind == scanner.Whitespace {
-						continue
-					}
-					if tokens[j].Kind == scanner.Ident &&
-						IsCustomProperty(tokens[j].Value) {
-						varStart := tok.Offset
-						varEnd := tokens[j].End
-						for k := j + 1; k < len(tokens); k++ {
-							if tokens[k].Kind == scanner.ParenClose {
-								varEnd = tokens[k].End
-								break
-							}
-						}
-						if offset >= varStart && offset <= varEnd {
-							name = tokens[j].Value
-							start = varStart
-							end = varEnd
-							return false
-						}
-					}
-					break
-				}
+		for _, ref := range findVarRefs(tokens) {
+			if offset >= ref.varStart &&
+				offset <= ref.varEnd {
+				name = tokens[ref.identIdx].Value
+				start = ref.varStart
+				end = ref.varEnd
+				return false
 			}
+		}
 
-			// Check if cursor is directly on a --variable ident
-			// inside a var()
+		// Check if cursor is directly on a --variable ident
+		// inside a var()
+		for _, tok := range tokens {
 			if tok.Kind == scanner.Ident &&
 				IsCustomProperty(tok.Value) &&
 				offset >= tok.Offset && offset <= tok.End {
-				if i > 0 {
-					for k := i - 1; k >= 0; k-- {
-						if tokens[k].Kind == scanner.Whitespace {
-							continue
-						}
-						if tokens[k].Kind == scanner.Function &&
-							strings.ToLower(tokens[k].Value) == VarFunctionName {
-							varStart := tokens[k].Offset
-							varEnd := tok.End
-							for m := i + 1; m < len(tokens); m++ {
-								if tokens[m].Kind == scanner.ParenClose {
-									varEnd = tokens[m].End
-									break
-								}
-							}
-							name = tok.Value
-							start = varStart
-							end = varEnd
-							return false
-						}
-						break
+				for _, ref := range findVarRefs(tokens) {
+					if tokens[ref.identIdx].Offset == tok.Offset {
+						name = tok.Value
+						start = ref.varStart
+						end = ref.varEnd
+						return false
 					}
 				}
 			}
@@ -265,20 +240,9 @@ func ForEachVarUsage(
 			return true
 		}
 
-		for i, tok := range decl.Value.Tokens {
-			if tok.Kind == scanner.Function &&
-				strings.ToLower(tok.Value) == VarFunctionName {
-				for j := i + 1; j < len(decl.Value.Tokens); j++ {
-					t := decl.Value.Tokens[j]
-					if t.Kind == scanner.Whitespace {
-						continue
-					}
-					if t.Kind == scanner.Ident &&
-						t.Value == name {
-						fn(t)
-					}
-					break
-				}
+		for _, ref := range findVarRefs(decl.Value.Tokens) {
+			if decl.Value.Tokens[ref.identIdx].Value == name {
+				fn(decl.Value.Tokens[ref.identIdx])
 			}
 		}
 

@@ -928,6 +928,32 @@ func TestFormat_NestedFunctionCommasInlinePrefix(t *testing.T) {
 	}
 }
 
+func TestFormat_SingleFunctionCommasInlinePrefix(t *testing.T) {
+	src := []byte(`.slider {
+  background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) var(--slider-progress, 0%), var(--control-bg) var(--slider-progress, 0%), var(--control-bg) 100%);
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		PrintWidth:   60,
+	})
+
+	expected := `.slider {
+  background: linear-gradient(
+    to right,
+    var(--color-accent) 0%,
+    var(--color-accent) var(--slider-progress, 0%),
+    var(--control-bg) var(--slider-progress, 0%),
+    var(--control-bg) 100%);
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
 func TestFormatPreserve_SingleLineExceedsPrintWidth(t *testing.T) {
 	// Single-line source that exceeds print-width → expands
 	src := []byte(`.foo{color:red;background:blue;}`)
@@ -941,5 +967,35 @@ func TestFormatPreserve_SingleLineExceedsPrintWidth(t *testing.T) {
 	expected := ".foo {\n  color: red;\n  background: blue;\n}\n"
 	if result != expected {
 		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormat_BlankLineBeforeCommentInRuleset(t *testing.T) {
+	src := []byte(`.foo {
+  scrollbar-color: red transparent;
+
+  /* Filter input */
+  > input[type="search"] {
+    color: blue;
+  }
+}
+`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+
+	expected := `.foo {
+  scrollbar-color: red transparent;
+
+  /* Filter input */
+  > input[type="search"] {
+    color: blue;
+  }
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s", result, expected)
 	}
 }

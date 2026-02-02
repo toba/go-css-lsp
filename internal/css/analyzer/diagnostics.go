@@ -43,6 +43,21 @@ type diagAnalyzer struct {
 	diags []Diagnostic
 }
 
+func (a *diagAnalyzer) addDiag(
+	msg string, startOff, endOff, severity int,
+) {
+	line, char := OffsetToLineChar(a.src, startOff)
+	endLine, endChar := OffsetToLineChar(a.src, endOff)
+	a.diags = append(a.diags, Diagnostic{
+		Message:   msg,
+		StartLine: line,
+		StartChar: char,
+		EndLine:   endLine,
+		EndChar:   endChar,
+		Severity:  severity,
+	})
+}
+
 func (a *diagAnalyzer) analyzeStylesheet(ss *parser.Stylesheet) {
 	for _, child := range ss.Children {
 		switch n := child.(type) {
@@ -57,20 +72,10 @@ func (a *diagAnalyzer) analyzeStylesheet(ss *parser.Stylesheet) {
 func (a *diagAnalyzer) analyzeRuleset(rs *parser.Ruleset) {
 	// Check for empty rulesets
 	if len(rs.Children) == 0 {
-		line, char := OffsetToLineChar(
-			a.src, rs.Offset(),
+		a.addDiag(
+			EmptyRulesetMsg, rs.Offset(), rs.End(),
+			SeverityHint,
 		)
-		endLine, endChar := OffsetToLineChar(
-			a.src, rs.End(),
-		)
-		a.diags = append(a.diags, Diagnostic{
-			Message:   EmptyRulesetMsg,
-			StartLine: line,
-			StartChar: char,
-			EndLine:   endLine,
-			EndChar:   endChar,
-			Severity:  SeverityHint,
-		})
 	}
 
 	seen := make(map[string]bool)
@@ -100,20 +105,11 @@ func (a *diagAnalyzer) analyzeDeclaration(
 
 	// Check for unknown properties
 	if !data.IsKnownProperty(propName) {
-		line, char := OffsetToLineChar(
-			a.src, decl.Property.Offset,
+		a.addDiag(
+			UnknownPropertyMessage(propName),
+			decl.Property.Offset, decl.Property.End,
+			SeverityWarning,
 		)
-		endLine, endChar := OffsetToLineChar(
-			a.src, decl.Property.End,
-		)
-		a.diags = append(a.diags, Diagnostic{
-			Message:   UnknownPropertyMessage(propName),
-			StartLine: line,
-			StartChar: char,
-			EndLine:   endLine,
-			EndChar:   endChar,
-			Severity:  SeverityWarning,
-		})
 	} else {
 		prop := data.LookupProperty(propName)
 		if prop != nil && a.opts.Experimental != ExperimentalIgnore &&
@@ -122,59 +118,32 @@ func (a *diagAnalyzer) analyzeDeclaration(
 			if a.opts.Experimental == ExperimentalError {
 				sev = SeverityError
 			}
-			line, char := OffsetToLineChar(
-				a.src, decl.Property.Offset,
+			a.addDiag(
+				ExperimentalPropertyMessage(propName),
+				decl.Property.Offset, decl.Property.End,
+				sev,
 			)
-			endLine, endChar := OffsetToLineChar(
-				a.src, decl.Property.End,
-			)
-			a.diags = append(a.diags, Diagnostic{
-				Message:   ExperimentalPropertyMessage(propName),
-				StartLine: line,
-				StartChar: char,
-				EndLine:   endLine,
-				EndChar:   endChar,
-				Severity:  sev,
-			})
 		} else if prop != nil && a.opts.Deprecated != DeprecatedIgnore &&
 			prop.IsDeprecated() {
 			sev := SeverityWarning
 			if a.opts.Deprecated == DeprecatedError {
 				sev = SeverityError
 			}
-			line, char := OffsetToLineChar(
-				a.src, decl.Property.Offset,
+			a.addDiag(
+				DeprecatedPropertyMessage(propName),
+				decl.Property.Offset, decl.Property.End,
+				sev,
 			)
-			endLine, endChar := OffsetToLineChar(
-				a.src, decl.Property.End,
-			)
-			a.diags = append(a.diags, Diagnostic{
-				Message:   DeprecatedPropertyMessage(propName),
-				StartLine: line,
-				StartChar: char,
-				EndLine:   endLine,
-				EndChar:   endChar,
-				Severity:  sev,
-			})
 		}
 	}
 
 	// Check for duplicate properties
 	if seen[propName] {
-		line, char := OffsetToLineChar(
-			a.src, decl.Property.Offset,
+		a.addDiag(
+			DuplicatePropertyMessage(propName),
+			decl.Property.Offset, decl.Property.End,
+			SeverityWarning,
 		)
-		endLine, endChar := OffsetToLineChar(
-			a.src, decl.Property.End,
-		)
-		a.diags = append(a.diags, Diagnostic{
-			Message:   DuplicatePropertyMessage(propName),
-			StartLine: line,
-			StartChar: char,
-			EndLine:   endLine,
-			EndChar:   endChar,
-			Severity:  SeverityWarning,
-		})
 	}
 	seen[propName] = true
 
@@ -186,38 +155,20 @@ func (a *diagAnalyzer) analyzeDeclaration(
 
 	// Check for !important usage
 	if decl.Important {
-		line, char := OffsetToLineChar(
-			a.src, decl.StartPos,
+		a.addDiag(
+			AvoidImportantMsg,
+			decl.StartPos, decl.EndPos,
+			SeverityHint,
 		)
-		endLine, endChar := OffsetToLineChar(
-			a.src, decl.EndPos,
-		)
-		a.diags = append(a.diags, Diagnostic{
-			Message:   AvoidImportantMsg,
-			StartLine: line,
-			StartChar: char,
-			EndLine:   endLine,
-			EndChar:   endChar,
-			Severity:  SeverityHint,
-		})
 	}
 
 	// Check for vendor prefixes
 	if hasVendorPrefix(propName) {
-		line, char := OffsetToLineChar(
-			a.src, decl.Property.Offset,
+		a.addDiag(
+			VendorPrefixMessage(propName),
+			decl.Property.Offset, decl.Property.End,
+			SeverityHint,
 		)
-		endLine, endChar := OffsetToLineChar(
-			a.src, decl.Property.End,
-		)
-		a.diags = append(a.diags, Diagnostic{
-			Message:   VendorPrefixMessage(propName),
-			StartLine: line,
-			StartChar: char,
-			EndLine:   endLine,
-			EndChar:   endChar,
-			Severity:  SeverityHint,
-		})
 	}
 }
 
@@ -244,21 +195,11 @@ func (a *diagAnalyzer) checkZeroWithUnit(
 		if unit == "s" || unit == "ms" {
 			continue
 		}
-		line, char := OffsetToLineChar(
-			a.src, tok.Offset,
+		a.addDiag(
+			"unnecessary unit: '"+val+"' can be written as '0'",
+			tok.Offset, tok.End,
+			SeverityHint,
 		)
-		endLine, endChar := OffsetToLineChar(
-			a.src, tok.End,
-		)
-		a.diags = append(a.diags, Diagnostic{
-			Message: "unnecessary unit: '" +
-				val + "' can be written as '0'",
-			StartLine: line,
-			StartChar: char,
-			EndLine:   endLine,
-			EndChar:   endChar,
-			Severity:  SeverityHint,
-		})
 	}
 }
 
@@ -322,22 +263,11 @@ func (a *diagAnalyzer) checkUnknownValues(
 		if !a.opts.StrictColorNames && isNamedColor(val) {
 			continue
 		}
-		line, char := OffsetToLineChar(
-			a.src, tok.Offset,
+		a.addDiag(
+			UnknownValueMessage(tok.Value, propName),
+			tok.Offset, tok.End,
+			sev,
 		)
-		endLine, endChar := OffsetToLineChar(
-			a.src, tok.End,
-		)
-		a.diags = append(a.diags, Diagnostic{
-			Message: UnknownValueMessage(
-				tok.Value, propName,
-			),
-			StartLine: line,
-			StartChar: char,
-			EndLine:   endLine,
-			EndChar:   endChar,
-			Severity:  sev,
-		})
 	}
 }
 
@@ -348,20 +278,11 @@ func isNamedColor(val string) bool {
 
 func (a *diagAnalyzer) analyzeAtRule(rule *parser.AtRule) {
 	if !data.IsKnownAtRule(rule.Name) {
-		line, char := OffsetToLineChar(
-			a.src, rule.Offset(),
+		a.addDiag(
+			UnknownAtRuleMessage(rule.Name),
+			rule.Offset(), rule.Offset()+len(rule.Name)+1,
+			SeverityWarning,
 		)
-		endLine, endChar := OffsetToLineChar(
-			a.src, rule.Offset()+len(rule.Name)+1,
-		)
-		a.diags = append(a.diags, Diagnostic{
-			Message:   UnknownAtRuleMessage(rule.Name),
-			StartLine: line,
-			StartChar: char,
-			EndLine:   endLine,
-			EndChar:   endChar,
-			Severity:  SeverityWarning,
-		})
 	}
 
 	if rule.Block != nil {

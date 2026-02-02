@@ -1,10 +1,7 @@
 package analyzer
 
 import (
-	"strings"
-
 	"github.com/toba/go-css-lsp/internal/css/parser"
-	"github.com/toba/go-css-lsp/internal/css/scanner"
 )
 
 // RenameEdit represents a text replacement for a rename.
@@ -58,35 +55,17 @@ func PrepareRename(
 		}
 
 		tokens := decl.Value.Tokens
-		for i, tok := range tokens {
-			if tok.Kind == scanner.Function &&
-				strings.ToLower(tok.Value) == VarFunctionName {
-				for j := i + 1; j < len(tokens); j++ {
-					if tokens[j].Kind == scanner.Whitespace {
-						continue
-					}
-					if tokens[j].Kind == scanner.Ident &&
-						tokens[j].Value == name &&
-						offset >= tok.Offset {
-						// Check if within var() range
-						varEnd := tokens[j].End
-						for k := j + 1; k < len(tokens); k++ {
-							if tokens[k].Kind == scanner.ParenClose {
-								varEnd = tokens[k].End
-								break
-							}
-						}
-						if offset <= varEnd {
-							loc = Location{
-								StartPos: tokens[j].Offset,
-								EndPos:   tokens[j].End,
-							}
-							found = true
-							return false
-						}
-					}
-					break
+		for _, ref := range findVarRefs(tokens) {
+			ident := tokens[ref.identIdx]
+			if ident.Value == name &&
+				offset >= ref.varStart &&
+				offset <= ref.varEnd {
+				loc = Location{
+					StartPos: ident.Offset,
+					EndPos:   ident.End,
 				}
+				found = true
+				return false
 			}
 		}
 

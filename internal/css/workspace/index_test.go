@@ -1,6 +1,10 @@
 package workspace
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/toba/go-css-lsp/internal/css/parser"
+)
 
 func TestIndex_IndexFile(t *testing.T) {
 	idx := NewIndex()
@@ -221,5 +225,76 @@ func TestIndex_AllVariableNames(t *testing.T) {
 	names := idx.AllVariableNames()
 	if len(names) != 2 {
 		t.Fatalf("expected 2 names, got %d", len(names))
+	}
+}
+
+func TestFindReferences(t *testing.T) {
+	idx := NewIndex()
+
+	srcA := []byte(`:root { --color: red; }`)
+	srcB := []byte(`.card { background: var(--color); }`)
+	srcC := []byte(`.btn { color: var(--color); }`)
+
+	idx.IndexFile("file:///a.css", srcA)
+	idx.IndexFile("file:///b.css", srcB)
+	idx.IndexFile("file:///c.css", srcC)
+
+	files := map[string][]byte{
+		"file:///a.css": srcA,
+		"file:///b.css": srcB,
+		"file:///c.css": srcC,
+	}
+
+	refs := idx.FindReferences(
+		"--color", files,
+		map[string]*parser.Stylesheet{},
+	)
+
+	// 1 definition + 2 usages = 3
+	if len(refs) != 3 {
+		t.Fatalf("expected 3 references, got %d", len(refs))
+	}
+}
+
+func TestIndexFileWithStylesheet_NilStylesheet(t *testing.T) {
+	idx := NewIndex()
+
+	// Should not panic with nil stylesheet
+	idx.IndexFileWithStylesheet("file:///x.css", nil, nil)
+
+	names := idx.AllVariableNames()
+	if len(names) != 0 {
+		t.Errorf("expected 0 names, got %d", len(names))
+	}
+}
+
+func TestIndexFile_EmptySource(t *testing.T) {
+	idx := NewIndex()
+
+	idx.IndexFile("file:///empty.css", []byte(""))
+
+	names := idx.AllVariableNames()
+	if len(names) != 0 {
+		t.Errorf("expected 0 names, got %d", len(names))
+	}
+}
+
+func TestIndexFile_VarsInMediaRule(t *testing.T) {
+	idx := NewIndex()
+
+	src := []byte(`@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; }
+}`)
+	idx.IndexFile("file:///theme.css", src)
+
+	defs := idx.LookupDefinitions("--bg")
+	if len(defs) != 1 {
+		t.Fatalf("expected 1 definition, got %d", len(defs))
+	}
+	if defs[0].RawValue != "#000" {
+		t.Errorf(
+			"expected RawValue '#000', got %q",
+			defs[0].RawValue,
+		)
 	}
 }
