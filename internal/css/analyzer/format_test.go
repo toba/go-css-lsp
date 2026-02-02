@@ -502,8 +502,8 @@ func TestFormat_LongValueWrapsAtShallowestCommas(t *testing.T) {
 	})
 
 	expected := `:root {
-  --color-bg-top:
-    light-dark(hsl(from var(--brand-deep-pockets) h calc(s - 40) calc(l + 40)),
+  --color-bg-top: light-dark(
+    hsl(from var(--brand-deep-pockets) h calc(s - 40) calc(l + 40)),
     hsl(from var(--brand-deep-pockets) h calc(s - 40) l));
 }
 `
@@ -876,6 +876,55 @@ func TestFormat_ExpandedStillHasBlankLines(t *testing.T) {
 	expected := ".parent {\n  color: red;\n\n  &:hover {\n    color: blue;\n  }\n}\n"
 	if result != expected {
 		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormat_TopLevelCommasBreakAfterColon(t *testing.T) {
+	// Top-level commas (depth 0) should break after colon, not inline prefix
+	src := []byte(`.glow {
+  background: linear-gradient(var(--a), var(--b)) padding-box, conic-gradient(from var(--angle), transparent 40%, var(--teal), transparent 60%) border-box;
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		PrintWidth:   80,
+	})
+
+	expected := `.glow {
+  background:
+    linear-gradient(var(--a), var(--b)) padding-box,
+    conic-gradient(from var(--angle), transparent 40%, var(--teal), transparent 60%) border-box;
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
+func TestFormat_NestedFunctionCommasInlinePrefix(t *testing.T) {
+	// Commas at depth 2 (inside rgb() inside light-dark()) — prefix up to
+	// the depth-2 function opening should stay inline
+	src := []byte(`:root {
+  --shadow: light-dark(0 1px 3px rgb(0, 0, 0, 0.12), 0 1px 3px rgb(255, 255, 255, 0.12));
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		PrintWidth:   60,
+	})
+
+	expected := `:root {
+  --shadow: light-dark(
+    0 1px 3px rgb(0, 0, 0, 0.12),
+    0 1px 3px rgb(255, 255, 255, 0.12));
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
 	}
 }
 

@@ -285,6 +285,11 @@ func (a *diagAnalyzer) checkUnknownValues(
 		}
 	}
 
+	// Properties that accept CSS property names as values
+	acceptsPropertyNames := propName == "transition" ||
+		propName == "transition-property" ||
+		propName == "will-change"
+
 	// Build lookup set for property values
 	validValues := make(map[string]bool, len(prop.Values)+len(data.GlobalValues))
 	for _, v := range prop.Values {
@@ -305,6 +310,11 @@ func (a *diagAnalyzer) checkUnknownValues(
 		}
 		val := strings.ToLower(tok.Value)
 		if validValues[val] {
+			continue
+		}
+		// Accept known CSS property names for properties
+		// like transition, transition-property, will-change
+		if acceptsPropertyNames && data.IsKnownProperty(val) {
 			continue
 		}
 		// In lenient color mode, accept named colors

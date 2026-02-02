@@ -227,13 +227,18 @@ func (f *formatter) formatDeclaration(
 			lineLen += 11 // " !important"
 		}
 
-		commaIndices := f.shallowestCommaIndices(decl.Value)
+		commaIndices, commaDepth := f.shallowestCommaIndices(decl.Value)
 
 		if lineLen > f.opts.PrintWidth && len(commaIndices) > 0 {
 			f.writeIndent()
 			f.buf.WriteString(decl.Property.Value)
-			f.buf.WriteString(":\n")
-			f.writeValueMultiLine(decl.Value, commaIndices)
+			if commaDepth > 0 {
+				f.buf.WriteString(": ")
+				f.writeValueMultiLine(decl.Value, commaIndices, commaDepth)
+			} else {
+				f.buf.WriteString(":\n")
+				f.writeValueMultiLine(decl.Value, commaIndices, 0)
+			}
 			if decl.Important {
 				f.buf.WriteString(" !important")
 			}
@@ -263,7 +268,7 @@ func (f *formatter) formatDeclaration(
 // shallowest depth that contains any.
 func (f *formatter) shallowestCommaIndices(
 	v *parser.Value,
-) []int {
+) ([]int, int) {
 	type commaInfo struct {
 		index int
 		depth int
@@ -292,7 +297,10 @@ func (f *formatter) shallowestCommaIndices(
 			indices = append(indices, c.index)
 		}
 	}
-	return indices
+	if minDepth < 0 {
+		minDepth = 0
+	}
+	return indices, minDepth
 }
 
 // writeValueMultiLine writes a value across multiple lines,
@@ -301,6 +309,7 @@ func (f *formatter) shallowestCommaIndices(
 func (f *formatter) writeValueMultiLine(
 	v *parser.Value,
 	commaIndices []int,
+	commaDepth int,
 ) {
 	commaSet := make(map[int]bool, len(commaIndices))
 	for _, idx := range commaIndices {
@@ -308,38 +317,109 @@ func (f *formatter) writeValueMultiLine(
 	}
 
 	f.indent++
-	f.writeIndent()
 
-	prevEnd := -1
-	prevKind := scanner.EOF
-	afterBreak := true
-	for i, tok := range v.Tokens {
-		if tok.Kind == scanner.Whitespace {
-			continue
-		}
-		if commaSet[i] {
-			// Write the comma, then newline + indent
-			f.buf.WriteByte(',')
-			f.buf.WriteByte('\n')
-			f.writeIndent()
+	if commaDepth > 0 {
+		// Write prefix tokens inline until reaching the function
+		// at commaDepth, then break after its open paren.
+		depth := 0
+		prevEnd := -1
+		prevKind := scanner.EOF
+		startIdx := 0
+		for i, tok := range v.Tokens {
+			if tok.Kind == scanner.Whitespace {
+				continue
+			}
+			if prevEnd >= 0 && tok.Offset > prevEnd {
+				if tok.Kind != scanner.ParenClose &&
+					prevKind != scanner.Function &&
+					prevKind != scanner.ParenOpen {
+					f.buf.WriteByte(' ')
+				}
+			}
+			f.buf.WriteString(
+				string(f.src[tok.Offset:tok.End]),
+			)
 			prevEnd = tok.End
 			prevKind = tok.Kind
-			afterBreak = true
-			continue
-		}
-		if !afterBreak && prevEnd >= 0 && tok.Offset > prevEnd {
-			if tok.Kind != scanner.ParenClose &&
-				prevKind != scanner.Function &&
-				prevKind != scanner.ParenOpen {
-				f.buf.WriteByte(' ')
+			if tok.Kind == scanner.Function ||
+				tok.Kind == scanner.ParenOpen {
+				depth++
+				if depth == commaDepth {
+					f.buf.WriteByte('\n')
+					f.writeIndent()
+					startIdx = i + 1
+					break
+				}
+			}
+			if tok.Kind == scanner.ParenClose && depth > 0 {
+				depth--
 			}
 		}
-		afterBreak = false
-		f.buf.WriteString(
-			string(f.src[tok.Offset:tok.End]),
-		)
-		prevEnd = tok.End
-		prevKind = tok.Kind
+		// Continue with comma-breaking loop from startIdx.
+		afterBreak := true
+		prevEnd = -1
+		prevKind = scanner.EOF
+		for i := startIdx; i < len(v.Tokens); i++ {
+			tok := v.Tokens[i]
+			if tok.Kind == scanner.Whitespace {
+				continue
+			}
+			if commaSet[i] {
+				f.buf.WriteByte(',')
+				f.buf.WriteByte('\n')
+				f.writeIndent()
+				prevEnd = tok.End
+				prevKind = tok.Kind
+				afterBreak = true
+				continue
+			}
+			if !afterBreak && prevEnd >= 0 && tok.Offset > prevEnd {
+				if tok.Kind != scanner.ParenClose &&
+					prevKind != scanner.Function &&
+					prevKind != scanner.ParenOpen {
+					f.buf.WriteByte(' ')
+				}
+			}
+			afterBreak = false
+			f.buf.WriteString(
+				string(f.src[tok.Offset:tok.End]),
+			)
+			prevEnd = tok.End
+			prevKind = tok.Kind
+		}
+	} else {
+		f.writeIndent()
+
+		prevEnd := -1
+		prevKind := scanner.EOF
+		afterBreak := true
+		for i, tok := range v.Tokens {
+			if tok.Kind == scanner.Whitespace {
+				continue
+			}
+			if commaSet[i] {
+				f.buf.WriteByte(',')
+				f.buf.WriteByte('\n')
+				f.writeIndent()
+				prevEnd = tok.End
+				prevKind = tok.Kind
+				afterBreak = true
+				continue
+			}
+			if !afterBreak && prevEnd >= 0 && tok.Offset > prevEnd {
+				if tok.Kind != scanner.ParenClose &&
+					prevKind != scanner.Function &&
+					prevKind != scanner.ParenOpen {
+					f.buf.WriteByte(' ')
+				}
+			}
+			afterBreak = false
+			f.buf.WriteString(
+				string(f.src[tok.Offset:tok.End]),
+			)
+			prevEnd = tok.End
+			prevKind = tok.Kind
+		}
 	}
 
 	f.indent--

@@ -361,6 +361,106 @@ func TestAnalyzeUnknownValue_NoValuesProperty(t *testing.T) {
 	}
 }
 
+func TestAnalyzeUnknownValue_TransitionProperty(t *testing.T) {
+	src := []byte(
+		`body { transition: border-color 0.15s, background 0.15s, color 0.15s; }`,
+	)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	for _, d := range diags {
+		if d.Message == UnknownValueMessage("border-color", "transition") ||
+			d.Message == UnknownValueMessage("background", "transition") ||
+			d.Message == UnknownValueMessage("color", "transition") {
+			t.Errorf("CSS property names should be accepted in transition: %s", d.Message)
+		}
+	}
+}
+
+func TestAnalyzeUnknownValue_TransitionPropertyProp(
+	t *testing.T,
+) {
+	src := []byte(
+		`body { transition-property: opacity, transform; }`,
+	)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	for _, d := range diags {
+		if d.Message == UnknownValueMessage("opacity", "transition-property") ||
+			d.Message == UnknownValueMessage("transform", "transition-property") {
+			t.Errorf(
+				"CSS property names should be accepted in transition-property: %s",
+				d.Message,
+			)
+		}
+	}
+}
+
+func TestAnalyzeUnknownValue_WillChange(t *testing.T) {
+	src := []byte(`body { will-change: opacity, transform; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	for _, d := range diags {
+		if d.Message == UnknownValueMessage("opacity", "will-change") ||
+			d.Message == UnknownValueMessage("transform", "will-change") {
+			t.Errorf(
+				"CSS property names should be accepted in will-change: %s",
+				d.Message,
+			)
+		}
+	}
+}
+
+func TestAnalyzeUnknownValue_TransitionFakeProperty(
+	t *testing.T,
+) {
+	src := []byte(
+		`body { transition: fake-not-a-property 0.15s; }`,
+	)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	if _, ok := findDiagnostic(
+		diags,
+		UnknownValueMessage(
+			"fake-not-a-property", "transition",
+		),
+	); !ok {
+		t.Error(
+			"fake property names should still be flagged " +
+				"in transition",
+		)
+	}
+}
+
+func TestAnalyzeUnknownValue_AnimationName(t *testing.T) {
+	src := []byte(`body { animation-name: myAnimation; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	for _, d := range diags {
+		if d.Message == UnknownValueMessage("myAnimation", "animation-name") {
+			t.Error("animation-name should accept arbitrary identifiers")
+		}
+	}
+}
+
+func TestAnalyzeUnknownValue_Animation(t *testing.T) {
+	src := []byte(
+		`body { animation: mySlide 0.3s ease-in; }`,
+	)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	for _, d := range diags {
+		if d.Message == UnknownValueMessage("mySlide", "animation") {
+			t.Error("animation should accept arbitrary keyframe names")
+		}
+	}
+}
+
 func TestAnalyzeDeprecatedProperty_Warn(t *testing.T) {
 	src := []byte(`div { clip: rect(0, 0, 0, 0); }`)
 	ss := parseCSS(t, src)

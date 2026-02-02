@@ -118,17 +118,6 @@ var Properties = []Property{
 		Name:        "animation",
 		Description: "Shorthand property combines six of the animation properties into a single property.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/animation",
-		Values: []string{
-			"alternate",
-			"alternate-reverse",
-			"backwards",
-			"both",
-			"forwards",
-			"infinite",
-			"none",
-			"normal",
-			"reverse",
-		},
 	},
 	{
 		Name:        "animation-composition",
@@ -167,7 +156,6 @@ var Properties = []Property{
 		Name:        "animation-name",
 		Description: "Defines a list of animations that apply. Each name is used to select the keyframe at-rule that provides the property values for the animation.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/animation-name",
-		Values: []string{"none"},
 	},
 	{
 		Name:        "animation-play-state",
