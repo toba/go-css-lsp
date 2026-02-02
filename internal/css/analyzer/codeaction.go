@@ -9,6 +9,7 @@ import (
 // CodeActionKind constants.
 const (
 	CodeActionQuickFix = "quickfix"
+	CodeActionRefactor = "refactor"
 )
 
 // CodeAction represents a code action (quick fix).

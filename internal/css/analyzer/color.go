@@ -1428,6 +1428,88 @@ func rgbToHSL(
 	return h, s, l
 }
 
+// detectColorFormat inspects source text at [start, end) and
+// returns "hex", "rgb", "hsl", or "other".
+func detectColorFormat(src []byte, start, end int) string {
+	if start < 0 || start >= len(src) {
+		return "other"
+	}
+	if src[start] == '#' {
+		return "hex"
+	}
+	text := strings.ToLower(string(src[start:end]))
+	if strings.HasPrefix(text, "rgb") {
+		return "rgb"
+	}
+	if strings.HasPrefix(text, "hsl") {
+		return "hsl"
+	}
+	return "other"
+}
+
+// FindColorCodeActions returns refactor code actions to convert
+// the color at the given byte offset to other formats.
+func FindColorCodeActions(
+	ss *parser.Stylesheet,
+	src []byte,
+	offset int,
+) []CodeAction {
+	colors := FindDocumentColors(ss, src)
+
+	var dc *DocumentColor
+	for i := range colors {
+		if offset >= colors[i].StartPos &&
+			offset <= colors[i].EndPos {
+			dc = &colors[i]
+			break
+		}
+	}
+	if dc == nil {
+		return nil
+	}
+
+	format := detectColorFormat(src, dc.StartPos, dc.EndPos)
+	presentations := ColorPresentation(dc.Color)
+
+	// presentations: [0]=hex, [1]=rgb, [2]=hsl
+	type entry struct {
+		label  string
+		format string
+		idx    int
+	}
+	entries := []entry{
+		{"Convert to hex", "hex", 0},
+		{"Convert to rgb", "rgb", 1},
+		{"Convert to hsl", "hsl", 2},
+	}
+
+	startLine, startChar := OffsetToLineChar(
+		src, dc.StartPos,
+	)
+	endLine, endChar := OffsetToLineChar(src, dc.EndPos)
+
+	var actions []CodeAction
+	for _, e := range entries {
+		if e.format == format {
+			continue
+		}
+		if e.idx >= len(presentations) {
+			continue
+		}
+		actions = append(actions, CodeAction{
+			Title:       e.label,
+			Kind:        CodeActionRefactor,
+			StartLine:   startLine,
+			StartChar:   startChar,
+			EndLine:     endLine,
+			EndChar:     endChar,
+			ReplaceWith: presentations[e.idx],
+		})
+	}
+
+	return actions
+}
+
 // namedColorMap maps CSS named colors to their RGBA values.
 var namedColorMap map[string]Color
 

@@ -1059,7 +1059,20 @@ func processCodeAction(
 		)
 	}
 
-	actions := css.CodeActions(analyzerDiags, src)
+	mu.Lock()
+	ss := storage.ParsedFiles[uri]
+	mu.Unlock()
+	if ss == nil {
+		result := css.Parse(src)
+		ss = result.Stylesheet
+	}
+
+	cursorLine := int(req.Params.Range.Start.Line)      //nolint:gosec
+	cursorChar := int(req.Params.Range.Start.Character) //nolint:gosec
+
+	actions := css.CodeActions(
+		ss, src, cursorLine, cursorChar, analyzerDiags,
+	)
 	result := make([]lsp.LSPCodeAction, len(actions))
 	for i, a := range actions {
 		result[i] = lsp.LSPCodeAction{

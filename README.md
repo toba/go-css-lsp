@@ -8,9 +8,9 @@ CSS3 only — no SCSS, Sass, or LESS.
 
 | Category | Capabilities |
 |----------|-------------|
-| **Diagnostics** | Unknown properties, duplicates, unknown at-rules, empty rulesets, `!important` hints, vendor prefix hints, zero-with-unit hints, parse errors |
-| **Hover** | Property documentation with MDN references |
-| **Completion** | Properties, values, at-rules, pseudo-classes, pseudo-elements, HTML elements, color functions |
+| **Diagnostics** | Unknown properties, duplicates, unknown at-rules, experimental property warnings, empty rulesets, `!important` hints, vendor prefix hints, zero-with-unit hints, parse errors |
+| **Hover** | Property documentation with MDN references, experimental status indicators |
+| **Completion** | Properties, values, at-rules, pseudo-classes, pseudo-elements, HTML elements, color functions; experimental features tagged |
 | **Colors** | Color picker for hex, named colors, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()`; convert between formats |
 | **Navigation** | Go to definition, find references, document symbols, document highlights |
 | **Editing** | Rename CSS custom properties, code actions (quick fixes), formatting (expanded/compact/preserve/detect modes), selection ranges |
@@ -58,7 +58,8 @@ Rulesets containing nested rules always use expanded format regardless of mode.
 {
   "initializationOptions": {
     "formatMode": "compact",
-    "printWidth": 80
+    "printWidth": 80,
+    "experimentalFeatures": "warning"
   }
 }
 ```
@@ -66,7 +67,18 @@ Rulesets containing nested rules always use expanded format regardless of mode.
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `formatMode` | string | `"expanded"` | `"expanded"`, `"compact"`, `"preserve"`, or `"detect"` |
-| `printWidth` | int | `80` | Max line width for compact mode |
+| `printWidth` | int | `80` | Max line width for compact/detect modes |
+| `experimentalFeatures` | string | `"warning"` | How to handle experimental CSS features: `"ignore"`, `"warning"`, or `"error"` |
+
+### Experimental Features
+
+Obsolete and nonstandard CSS properties are filtered out entirely and produce "unknown property" warnings. Experimental properties (e.g. `field-sizing`) are recognized but flagged based on the `experimentalFeatures` setting:
+
+| Value | Diagnostics | Completions |
+|-------|------------|-------------|
+| `"ignore"` | None | No tagging |
+| `"warning"` (default) | Warning severity | Tagged `(experimental)` |
+| `"error"` | Error severity | Tagged `(experimental)` |
 
 ## Credits
 

@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/toba/go-css-lsp/internal/css/parser"
@@ -803,5 +804,145 @@ func assertColorClose(
 			c.Red, c.Green, c.Blue, c.Alpha,
 			r, g, b, a,
 		)
+	}
+}
+
+func TestFindColorCodeActions_Hex(t *testing.T) {
+	src := []byte(`.a { color: #ff0000; }`)
+	ss, _ := parser.Parse(src)
+	// Place cursor on the hex color
+	offset := 12 // on '#'
+	actions := FindColorCodeActions(ss, src, offset)
+
+	if len(actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(actions))
+	}
+
+	// Should offer rgb and hsl, not hex
+	for _, a := range actions {
+		if a.Kind != CodeActionRefactor {
+			t.Errorf("expected refactor kind, got %s", a.Kind)
+		}
+		if a.Title == "Convert to hex" {
+			t.Error("should not offer conversion to same format")
+		}
+	}
+	if actions[0].Title != "Convert to rgb" {
+		t.Errorf("expected 'Convert to rgb', got %q",
+			actions[0].Title)
+	}
+	if actions[1].Title != "Convert to hsl" {
+		t.Errorf("expected 'Convert to hsl', got %q",
+			actions[1].Title)
+	}
+}
+
+func TestFindColorCodeActions_RGB(t *testing.T) {
+	src := []byte(`.a { color: rgb(255 0 0); }`)
+	ss, _ := parser.Parse(src)
+	offset := 13 // inside 'rgb('
+	actions := FindColorCodeActions(ss, src, offset)
+
+	if len(actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(actions))
+	}
+	if actions[0].Title != "Convert to hex" {
+		t.Errorf("expected 'Convert to hex', got %q",
+			actions[0].Title)
+	}
+	if actions[1].Title != "Convert to hsl" {
+		t.Errorf("expected 'Convert to hsl', got %q",
+			actions[1].Title)
+	}
+}
+
+func TestFindColorCodeActions_HSL(t *testing.T) {
+	src := []byte(`.a { color: hsl(0 100% 50%); }`)
+	ss, _ := parser.Parse(src)
+	offset := 13 // inside 'hsl('
+	actions := FindColorCodeActions(ss, src, offset)
+
+	if len(actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(actions))
+	}
+	if actions[0].Title != "Convert to hex" {
+		t.Errorf("expected 'Convert to hex', got %q",
+			actions[0].Title)
+	}
+	if actions[1].Title != "Convert to rgb" {
+		t.Errorf("expected 'Convert to rgb', got %q",
+			actions[1].Title)
+	}
+}
+
+func TestFindColorCodeActions_Named(t *testing.T) {
+	src := []byte(`.a { color: red; }`)
+	ss, _ := parser.Parse(src)
+	offset := 13 // on 'red'
+	actions := FindColorCodeActions(ss, src, offset)
+
+	// Named color is "other" format, so all three offered
+	if len(actions) != 3 {
+		t.Fatalf("expected 3 actions, got %d", len(actions))
+	}
+	if actions[0].Title != "Convert to hex" {
+		t.Errorf("expected 'Convert to hex', got %q",
+			actions[0].Title)
+	}
+	if actions[1].Title != "Convert to rgb" {
+		t.Errorf("expected 'Convert to rgb', got %q",
+			actions[1].Title)
+	}
+	if actions[2].Title != "Convert to hsl" {
+		t.Errorf("expected 'Convert to hsl', got %q",
+			actions[2].Title)
+	}
+}
+
+func TestFindColorCodeActions_NotOnColor(t *testing.T) {
+	src := []byte(`.a { color: #ff0000; margin: 10px; }`)
+	ss, _ := parser.Parse(src)
+	offset := 28 // on '10px'
+	actions := FindColorCodeActions(ss, src, offset)
+
+	if len(actions) != 0 {
+		t.Fatalf("expected 0 actions, got %d", len(actions))
+	}
+}
+
+func TestFindColorCodeActions_Alpha(t *testing.T) {
+	src := []byte(`.a { color: #ff000080; }`)
+	ss, _ := parser.Parse(src)
+	offset := 12
+	actions := FindColorCodeActions(ss, src, offset)
+
+	if len(actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(actions))
+	}
+
+	// Check that alpha is present in conversions
+	for _, a := range actions {
+		if a.ReplaceWith == "" {
+			t.Error("replacement should not be empty")
+		}
+		// rgb and hsl with alpha should contain "/"
+		if a.Title == "Convert to rgb" ||
+			a.Title == "Convert to hsl" {
+			if !strings.Contains(a.ReplaceWith, "/") {
+				t.Errorf(
+					"expected alpha separator in %q",
+					a.ReplaceWith,
+				)
+			}
+		}
+		// hex with alpha should be 9 chars (#rrggbbaa)
+		if a.Title == "Convert to hex" {
+			if len(a.ReplaceWith) != 9 {
+				t.Errorf(
+					"expected 9-char hex with alpha, got %q",
+					a.ReplaceWith,
+				)
+			}
+		}
 	}
 }

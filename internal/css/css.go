@@ -150,12 +150,21 @@ func DocumentHighlights(
 	return analyzer.FindDocumentHighlights(ss, src, offset)
 }
 
-// CodeActions returns code actions for the given diagnostics.
+// CodeActions returns code actions for the given diagnostics
+// and color conversion refactors at the cursor position.
 func CodeActions(
-	diags []analyzer.Diagnostic,
+	ss *parser.Stylesheet,
 	src []byte,
+	line, char int,
+	diags []analyzer.Diagnostic,
 ) []analyzer.CodeAction {
-	return analyzer.FindCodeActions(diags, src)
+	actions := analyzer.FindCodeActions(diags, src)
+	offset := LineCharToOffset(src, line, char)
+	actions = append(
+		actions,
+		analyzer.FindColorCodeActions(ss, src, offset)...,
+	)
+	return actions
 }
 
 // References finds all references to the symbol at the given
