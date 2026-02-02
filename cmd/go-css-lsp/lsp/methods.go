@@ -71,6 +71,7 @@ type ServerSettings struct {
 	FormatMode           string `json:"formatMode"`
 	PrintWidth           int    `json:"printWidth"`
 	ExperimentalFeatures string `json:"experimentalFeatures"`
+	DeprecatedFeatures   string `json:"deprecatedFeatures"`
 }
 
 // InitializeParams holds parameters for initialize request.

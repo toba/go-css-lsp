@@ -169,3 +169,53 @@ func TestAnalyzeNesting_NestedAtRule(t *testing.T) {
 		t.Error("@media should not be flagged as unknown")
 	}
 }
+
+func TestAnalyzeDeprecatedProperty_Warn(t *testing.T) {
+	src := []byte(`div { clip: rect(0, 0, 0, 0); }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{
+		Deprecated: DeprecatedWarn,
+	})
+
+	d, ok := findDiagnostic(
+		diags, DeprecatedPropertyMessage("clip"),
+	)
+	if !ok {
+		t.Fatal("expected deprecated property diagnostic")
+	}
+	if d.Severity != SeverityWarning {
+		t.Errorf("expected warning severity, got %d", d.Severity)
+	}
+}
+
+func TestAnalyzeDeprecatedProperty_Ignore(t *testing.T) {
+	src := []byte(`div { clip: rect(0, 0, 0, 0); }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{
+		Deprecated: DeprecatedIgnore,
+	})
+
+	if _, ok := findDiagnostic(
+		diags, DeprecatedPropertyMessage("clip"),
+	); ok {
+		t.Error("deprecated diagnostic should be suppressed")
+	}
+}
+
+func TestAnalyzeDeprecatedProperty_Error(t *testing.T) {
+	src := []byte(`div { clip: rect(0, 0, 0, 0); }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{
+		Deprecated: DeprecatedError,
+	})
+
+	d, ok := findDiagnostic(
+		diags, DeprecatedPropertyMessage("clip"),
+	)
+	if !ok {
+		t.Fatal("expected deprecated property diagnostic")
+	}
+	if d.Severity != SeverityError {
+		t.Errorf("expected error severity, got %d", d.Severity)
+	}
+}

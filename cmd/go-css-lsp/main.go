@@ -49,6 +49,19 @@ func experimentalModeFromString(s string) analyzer.ExperimentalMode {
 	}
 }
 
+// deprecatedModeFromString converts a setting string to
+// DeprecatedMode. Unrecognized values default to warn.
+func deprecatedModeFromString(s string) analyzer.DeprecatedMode {
+	switch s {
+	case "ignore":
+		return analyzer.DeprecatedIgnore
+	case "error":
+		return analyzer.DeprecatedError
+	default:
+		return analyzer.DeprecatedWarn
+	}
+}
+
 // TargetFileExtensions lists supported file extensions.
 var TargetFileExtensions = []string{"css"}
 
@@ -145,6 +158,9 @@ func main() {
 			if settings != nil {
 				storage.LintOpts.Experimental = experimentalModeFromString(
 					settings.ExperimentalFeatures,
+				)
+				storage.LintOpts.Deprecated = deprecatedModeFromString(
+					settings.DeprecatedFeatures,
 				)
 			}
 			notifyTheRootPath(

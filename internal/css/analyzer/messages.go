@@ -39,3 +39,9 @@ func UnknownAtRuleMessage(name string) string {
 func ExperimentalPropertyMessage(name string) string {
 	return "experimental property '" + name + "'"
 }
+
+// DeprecatedPropertyMessage returns a diagnostic message for
+// a deprecated (obsolete) CSS property.
+func DeprecatedPropertyMessage(name string) string {
+	return "deprecated property '" + name + "'"
+}

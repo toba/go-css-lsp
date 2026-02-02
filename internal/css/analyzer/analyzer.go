@@ -49,9 +49,24 @@ const (
 	ExperimentalError
 )
 
+// DeprecatedMode controls how deprecated (obsolete) CSS
+// features are reported.
+type DeprecatedMode int
+
+const (
+	// DeprecatedWarn emits a warning diagnostic (default).
+	DeprecatedWarn DeprecatedMode = iota
+	// DeprecatedIgnore suppresses deprecated diagnostics
+	// and completion tags.
+	DeprecatedIgnore
+	// DeprecatedError treats deprecated features as errors.
+	DeprecatedError
+)
+
 // LintOptions configures analyzer behavior.
 type LintOptions struct {
 	Experimental ExperimentalMode
+	Deprecated   DeprecatedMode
 }
 
 // Diagnostic represents a diagnostic message.

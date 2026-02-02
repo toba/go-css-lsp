@@ -8,7 +8,7 @@ CSS3 only — no SCSS, Sass, or LESS.
 
 | Category | Capabilities |
 |----------|-------------|
-| **Diagnostics** | Unknown properties, duplicates, unknown at-rules, experimental property warnings, empty rulesets, `!important` hints, vendor prefix hints, zero-with-unit hints, parse errors |
+| **Diagnostics** | Unknown properties, duplicates, unknown at-rules, experimental property warnings, deprecated property warnings, empty rulesets, `!important` hints, vendor prefix hints, zero-with-unit hints, parse errors |
 | **Hover** | Property documentation with MDN references, experimental status indicators |
 | **Completion** | Properties, values, at-rules, pseudo-classes, pseudo-elements, HTML elements, color functions; experimental features tagged |
 | **Colors** | Color picker for hex, named colors, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()`; convert between formats |
@@ -59,7 +59,8 @@ Rulesets containing nested rules always use expanded format regardless of mode.
   "initializationOptions": {
     "formatMode": "compact",
     "printWidth": 80,
-    "experimentalFeatures": "warning"
+    "experimentalFeatures": "warning",
+    "deprecatedFeatures": "warning"
   }
 }
 ```
@@ -69,16 +70,27 @@ Rulesets containing nested rules always use expanded format regardless of mode.
 | `formatMode` | string | `"expanded"` | `"expanded"`, `"compact"`, `"preserve"`, or `"detect"` |
 | `printWidth` | int | `80` | Max line width for compact/detect modes |
 | `experimentalFeatures` | string | `"warning"` | How to handle experimental CSS features: `"ignore"`, `"warning"`, or `"error"` |
+| `deprecatedFeatures` | string | `"warning"` | How to handle deprecated (obsolete) CSS features: `"ignore"`, `"warning"`, or `"error"` |
 
 ### Experimental Features
 
-Obsolete and nonstandard CSS properties are filtered out entirely and produce "unknown property" warnings. Experimental properties (e.g. `field-sizing`) are recognized but flagged based on the `experimentalFeatures` setting:
+Nonstandard CSS properties are filtered out entirely and produce "unknown property" warnings. Experimental properties (e.g. `field-sizing`) are recognized but flagged based on the `experimentalFeatures` setting:
 
 | Value | Diagnostics | Completions |
 |-------|------------|-------------|
 | `"ignore"` | None | No tagging |
 | `"warning"` (default) | Warning severity | Tagged `(experimental)` |
 | `"error"` | Error severity | Tagged `(experimental)` |
+
+### Deprecated Features
+
+Deprecated (obsolete) CSS properties (e.g. `clip`) are recognized and flagged based on the `deprecatedFeatures` setting:
+
+| Value | Diagnostics | Completions |
+|-------|------------|-------------|
+| `"ignore"` | None | No tagging |
+| `"warning"` (default) | Warning severity | Tagged `(deprecated)`, strikethrough |
+| `"error"` | Error severity | Tagged `(deprecated)`, strikethrough |
 
 ## Credits
 

@@ -96,7 +96,7 @@ func mdnURL(refs []cssReference) string {
 }
 
 func isDroppedStatus(status string) bool {
-	return status == "obsolete" || status == "nonstandard"
+	return status == "nonstandard"
 }
 
 func isVendorPrefixed(name string) bool {

@@ -140,3 +140,50 @@ func TestCompleteNotInString(t *testing.T) {
 		t.Error("expected ':hover' in pseudo-class completions")
 	}
 }
+
+func TestCompleteDeprecatedPropertyTagged(t *testing.T) {
+	src := []byte("body { cli }")
+	ss, _ := parser.Parse(src)
+
+	items := Complete(ss, src, 11, LintOptions{
+		Deprecated: DeprecatedWarn,
+	})
+
+	for _, item := range items {
+		if item.Label == "clip" {
+			if !item.Deprecated {
+				t.Error("expected Deprecated=true for 'clip'")
+			}
+			if len(item.Detail) < 12 ||
+				item.Detail[:13] != "(deprecated) " {
+				t.Errorf(
+					"expected '(deprecated) ' prefix, got %q",
+					item.Detail,
+				)
+			}
+			return
+		}
+	}
+	t.Error("expected 'clip' in property completions")
+}
+
+func TestCompleteDeprecatedPropertyNotTaggedWhenIgnored(
+	t *testing.T,
+) {
+	src := []byte("body { cli }")
+	ss, _ := parser.Parse(src)
+
+	items := Complete(ss, src, 11, LintOptions{
+		Deprecated: DeprecatedIgnore,
+	})
+
+	for _, item := range items {
+		if item.Label == "clip" {
+			if item.Deprecated {
+				t.Error("Deprecated should be false when ignored")
+			}
+			return
+		}
+	}
+	t.Error("expected 'clip' in property completions")
+}

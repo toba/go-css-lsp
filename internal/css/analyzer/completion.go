@@ -19,25 +19,26 @@ func Complete(
 	}
 
 	tag := opts.Experimental != ExperimentalIgnore
+	tagDep := opts.Deprecated != DeprecatedIgnore
 	ctx := determineContext(ss, src, offset)
 
 	switch ctx.kind {
 	case contextNone:
 		return nil
 	case contextProperty:
-		return completeProperties(ctx.prefix, tag)
+		return completeProperties(ctx.prefix, tag, tagDep)
 	case contextValue:
 		return completeValues(ctx.propertyName, ctx.prefix)
 	case contextAtRule:
-		return completeAtRules(ctx.prefix, tag)
+		return completeAtRules(ctx.prefix, tag, tagDep)
 	case contextPseudoClass:
-		return completePseudoClasses(ctx.prefix, tag)
+		return completePseudoClasses(ctx.prefix, tag, tagDep)
 	case contextPseudoElement:
-		return completePseudoElements(ctx.prefix, tag)
+		return completePseudoElements(ctx.prefix, tag, tagDep)
 	case contextSelector:
 		return completeSelectorStart(ctx.prefix)
 	default:
-		return completeTopLevel(ctx.prefix, tag)
+		return completeTopLevel(ctx.prefix, tag, tagDep)
 	}
 }
 
@@ -153,7 +154,7 @@ func determineContext(
 }
 
 func completeProperties(
-	prefix string, tagExperimental bool,
+	prefix string, tagExperimental, tagDeprecated bool,
 ) []CompletionItem {
 	var items []CompletionItem
 	prefix = strings.ToLower(prefix)
@@ -172,6 +173,10 @@ func completeProperties(
 		}
 		if tagExperimental && prop.IsExperimental() {
 			item.Detail = "(experimental) " + item.Detail
+		}
+		if tagDeprecated && prop.IsDeprecated() {
+			item.Detail = "(deprecated) " + item.Detail
+			item.Deprecated = true
 		}
 		items = append(items, item)
 	}
@@ -242,7 +247,7 @@ func completeValues(
 }
 
 func completeAtRules(
-	prefix string, tagExperimental bool,
+	prefix string, tagExperimental, tagDeprecated bool,
 ) []CompletionItem {
 	var items []CompletionItem
 	prefix = strings.ToLower(prefix)
@@ -260,6 +265,10 @@ func completeAtRules(
 		if tagExperimental && rule.IsExperimental() {
 			item.Detail = "(experimental) " + item.Detail
 		}
+		if tagDeprecated && rule.IsDeprecated() {
+			item.Detail = "(deprecated) " + item.Detail
+			item.Deprecated = true
+		}
 		items = append(items, item)
 	}
 
@@ -267,7 +276,7 @@ func completeAtRules(
 }
 
 func completePseudoClasses(
-	prefix string, tagExperimental bool,
+	prefix string, tagExperimental, tagDeprecated bool,
 ) []CompletionItem {
 	var items []CompletionItem
 	prefix = strings.ToLower(prefix)
@@ -285,6 +294,10 @@ func completePseudoClasses(
 		if tagExperimental && pc.IsExperimental() {
 			item.Detail = "(experimental) " + item.Detail
 		}
+		if tagDeprecated && pc.IsDeprecated() {
+			item.Detail = "(deprecated) " + item.Detail
+			item.Deprecated = true
+		}
 		items = append(items, item)
 	}
 
@@ -292,7 +305,7 @@ func completePseudoClasses(
 }
 
 func completePseudoElements(
-	prefix string, tagExperimental bool,
+	prefix string, tagExperimental, tagDeprecated bool,
 ) []CompletionItem {
 	var items []CompletionItem
 	prefix = strings.ToLower(prefix)
@@ -309,6 +322,10 @@ func completePseudoElements(
 		}
 		if tagExperimental && pe.IsExperimental() {
 			item.Detail = "(experimental) " + item.Detail
+		}
+		if tagDeprecated && pe.IsDeprecated() {
+			item.Detail = "(deprecated) " + item.Detail
+			item.Deprecated = true
 		}
 		items = append(items, item)
 	}
@@ -347,10 +364,10 @@ func completeSelectorStart(
 }
 
 func completeTopLevel(
-	prefix string, tagExperimental bool,
+	prefix string, tagExperimental, tagDeprecated bool,
 ) []CompletionItem {
 	items := completeSelectorStart(prefix)
-	items = append(items, completeAtRules(prefix, tagExperimental)...)
+	items = append(items, completeAtRules(prefix, tagExperimental, tagDeprecated)...)
 	return items
 }
 

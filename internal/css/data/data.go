@@ -32,6 +32,9 @@ type AtRuleDef struct {
 // IsExperimental returns true for experimental at-rules.
 func (a AtRuleDef) IsExperimental() bool { return a.Status == "experimental" }
 
+// IsDeprecated returns true for obsolete at-rules.
+func (a AtRuleDef) IsDeprecated() bool { return a.Status == "obsolete" }
+
 // PseudoClass describes a CSS pseudo-class.
 type PseudoClass struct {
 	Name        string
@@ -42,6 +45,9 @@ type PseudoClass struct {
 // IsExperimental returns true for experimental pseudo-classes.
 func (p PseudoClass) IsExperimental() bool { return p.Status == "experimental" }
 
+// IsDeprecated returns true for obsolete pseudo-classes.
+func (p PseudoClass) IsDeprecated() bool { return p.Status == "obsolete" }
+
 // PseudoElement describes a CSS pseudo-element.
 type PseudoElement struct {
 	Name        string
@@ -51,6 +57,9 @@ type PseudoElement struct {
 
 // IsExperimental returns true for experimental pseudo-elements.
 func (p PseudoElement) IsExperimental() bool { return p.Status == "experimental" }
+
+// IsDeprecated returns true for obsolete pseudo-elements.
+func (p PseudoElement) IsDeprecated() bool { return p.Status == "obsolete" }
 
 // Function describes a CSS function.
 type Function struct {

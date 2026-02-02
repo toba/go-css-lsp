@@ -113,8 +113,10 @@ func (a *diagAnalyzer) analyzeDeclaration(
 			EndChar:   endChar,
 			Severity:  SeverityWarning,
 		})
-	} else if a.opts.Experimental != ExperimentalIgnore {
-		if prop := data.LookupProperty(propName); prop != nil && prop.IsExperimental() {
+	} else {
+		prop := data.LookupProperty(propName)
+		if prop != nil && a.opts.Experimental != ExperimentalIgnore &&
+			prop.IsExperimental() {
 			sev := SeverityWarning
 			if a.opts.Experimental == ExperimentalError {
 				sev = SeverityError
@@ -127,6 +129,26 @@ func (a *diagAnalyzer) analyzeDeclaration(
 			)
 			a.diags = append(a.diags, Diagnostic{
 				Message:   ExperimentalPropertyMessage(propName),
+				StartLine: line,
+				StartChar: char,
+				EndLine:   endLine,
+				EndChar:   endChar,
+				Severity:  sev,
+			})
+		} else if prop != nil && a.opts.Deprecated != DeprecatedIgnore &&
+			prop.IsDeprecated() {
+			sev := SeverityWarning
+			if a.opts.Deprecated == DeprecatedError {
+				sev = SeverityError
+			}
+			line, char := OffsetToLineChar(
+				a.src, decl.Property.Offset,
+			)
+			endLine, endChar := OffsetToLineChar(
+				a.src, decl.Property.End,
+			)
+			a.diags = append(a.diags, Diagnostic{
+				Message:   DeprecatedPropertyMessage(propName),
 				StartLine: line,
 				StartChar: char,
 				EndLine:   endLine,
