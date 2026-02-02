@@ -33,3 +33,9 @@ func VendorPrefixMessage(name string) string {
 func UnknownAtRuleMessage(name string) string {
 	return UnknownAtRulePrefix + name + "'"
 }
+
+// ExperimentalPropertyMessage returns a diagnostic message for
+// an experimental CSS property.
+func ExperimentalPropertyMessage(name string) string {
+	return "experimental property '" + name + "'"
+}

@@ -31,9 +31,23 @@ type workspaceStore struct {
 	ParsedFiles map[string]*parser.Stylesheet
 	VarIndex    *workspace.Index
 	Settings    *lsp.ServerSettings
+	LintOpts    analyzer.LintOptions
 }
 
 const serverName = "go-css-lsp"
+
+// experimentalModeFromString converts a setting string to
+// ExperimentalMode. Unrecognized values default to warn.
+func experimentalModeFromString(s string) analyzer.ExperimentalMode {
+	switch s {
+	case "ignore":
+		return analyzer.ExperimentalIgnore
+	case "error":
+		return analyzer.ExperimentalError
+	default:
+		return analyzer.ExperimentalWarn
+	}
+}
 
 // TargetFileExtensions lists supported file extensions.
 var TargetFileExtensions = []string{"css"}
@@ -128,6 +142,11 @@ func main() {
 				data, serverName, version,
 			)
 			storage.Settings = settings
+			if settings != nil {
+				storage.LintOpts.Experimental = experimentalModeFromString(
+					settings.ExperimentalFeatures,
+				)
+			}
 			notifyTheRootPath(
 				rootPathNotification, rootURI,
 			)
@@ -326,28 +345,31 @@ func processHover(
 		ss = result.Stylesheet
 	}
 
-	content, found := css.Hover(
+	hover := css.Hover(
 		ss, src,
 		int(req.Params.Position.Line),      //nolint:gosec // LSP positions are small
 		int(req.Params.Position.Character), //nolint:gosec // LSP positions are small
 	)
 
-	type HoverResult struct {
-		Contents lsp.MarkupContent `json:"contents"`
-	}
-
-	res := lsp.ResponseMessage[*HoverResult]{
+	res := lsp.ResponseMessage[*lsp.HoverResult]{
 		JsonRpc: req.JsonRpc,
 		Id:      req.Id,
 	}
 
-	if found {
-		res.Result = &HoverResult{
+	if hover.Found {
+		hr := &lsp.HoverResult{
 			Contents: lsp.MarkupContent{
 				Kind:  "markdown",
-				Value: content,
+				Value: hover.Content,
 			},
 		}
+		if hover.RangeStart < hover.RangeEnd {
+			r := offsetRangeToLSPRange(
+				src, hover.RangeStart, hover.RangeEnd,
+			)
+			hr.Range = &r
+		}
+		res.Result = hr
 	}
 
 	out, err := json.Marshal(res)
@@ -393,6 +415,7 @@ func processCompletion(
 		ss, src,
 		int(req.Params.Position.Line),      //nolint:gosec // LSP positions are small
 		int(req.Params.Position.Character), //nolint:gosec // LSP positions are small
+		storage.LintOpts,
 	)
 
 	lspItems := make([]lsp.CompletionItem, len(items))
@@ -402,6 +425,8 @@ func processCompletion(
 			Kind:       item.Kind,
 			Detail:     item.Detail,
 			InsertText: item.InsertText,
+			Tags:       item.Tags,
+			Deprecated: item.Deprecated,
 		}
 		if item.Documentation != "" {
 			lspItems[i].Documentation = &lsp.MarkupContent{
@@ -1443,7 +1468,7 @@ func processDiagnosticNotification(
 		for uri, content := range filesToProcess {
 			storage.RawFiles[uri] = content
 
-			diags, ss := css.Diagnostics(content)
+			diags, ss := css.Diagnostics(content, storage.LintOpts)
 			storage.ParsedFiles[uri] = ss
 
 			// Update workspace variable index using

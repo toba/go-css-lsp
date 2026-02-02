@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/toba/go-css-lsp/internal/css/parser"
+	"github.com/toba/go-css-lsp/internal/css/scanner"
 )
 
 func TestFindDocumentColors_HexColors(t *testing.T) {
@@ -601,6 +602,187 @@ func TestFindDocumentColorsVarNilResolver(t *testing.T) {
 
 	if len(colors) != 0 {
 		t.Fatalf("expected 0 colors, got %d", len(colors))
+	}
+}
+
+func TestRelativeColor_RGBPassthrough(t *testing.T) {
+	src := []byte(`.foo { color: rgb(from red r g b); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 1.0)
+}
+
+func TestRelativeColor_HSLFromHex(t *testing.T) {
+	src := []byte(`.foo { color: hsl(from #ff0000 h s l); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 1.0)
+}
+
+func TestRelativeColor_LiteralSubstitution(t *testing.T) {
+	// rgb(from blue 255 g b) → r=255, g=0, b=255 → magenta
+	src := []byte(`.foo { color: rgb(from blue 255 g b); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 1.0, 1.0)
+}
+
+func TestRelativeColor_CalcExpression(t *testing.T) {
+	// hsl(from red h calc(s - 50) l) → reduced saturation
+	src := []byte(`.foo { color: hsl(from red h calc(s - 50) l); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	// red is hsl(0, 100%, 50%), calc(s-50) = 50%
+	// hsl(0, 50%, 50%) → rgb(191, 64, 64) approximately
+	c := colors[0].Color
+	if c.Red < 0.5 {
+		t.Errorf("expected reddish, got R=%.3f", c.Red)
+	}
+	if c.Green > 0.4 || c.Green < 0.15 {
+		t.Errorf(
+			"expected moderate green channel, got G=%.3f",
+			c.Green,
+		)
+	}
+}
+
+func TestRelativeColor_AlphaOverride(t *testing.T) {
+	src := []byte(`.foo { color: rgb(from red r g b / 50%); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 0.5)
+}
+
+func TestRelativeColor_NoneKeyword(t *testing.T) {
+	src := []byte(`.foo { color: rgb(from red none g b); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.0, 0.0, 0.0, 1.0)
+}
+
+func TestRelativeColor_VarOrigin(t *testing.T) {
+	src := []byte(`.foo { color: rgb(from var(--c) r g b / 40%); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{"--c": "#ff0000"},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 0.4)
+}
+
+func TestRelativeColor_NestedFunctionOrigin(t *testing.T) {
+	src := []byte(
+		`.foo { color: rgb(from hsl(0 100% 50%) r g b); }`,
+	)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 1.0)
+}
+
+func TestRelativeColor_OklchPassthrough(t *testing.T) {
+	src := []byte(`.foo { color: oklch(from green l c h); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	// green = {0, 0.502, 0, 1} — oklch passthrough should
+	// round-trip close to original
+	c := colors[0].Color
+	if c.Green < 0.4 {
+		t.Errorf("expected greenish, got G=%.3f", c.Green)
+	}
+	if c.Red > 0.1 {
+		t.Errorf("expected low red, got R=%.3f", c.Red)
+	}
+}
+
+func TestRelativeColor_PercentageChannel(t *testing.T) {
+	// rgb(from red 50% g b) → r channel = 50% of 255 = 127.5
+	src := []byte(`.foo { color: rgb(from red 50% g b); }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.5, 0.0, 0.0, 1.0)
+}
+
+func TestCalcEval(t *testing.T) {
+	tests := []struct {
+		expr string
+		vars map[string]float64
+		want float64
+		ok   bool
+	}{
+		{"10 + 5", nil, 15, true},
+		{"10 - 3", nil, 7, true},
+		{"2 * 3", nil, 6, true},
+		{"10 / 2", nil, 5, true},
+		{"2 + 3 * 4", nil, 14, true},
+		{"s - 50", map[string]float64{"s": 100}, 50, true},
+		{
+			"l + 40",
+			map[string]float64{"l": 10},
+			50,
+			true,
+		},
+		{"(2 + 3) * 4", nil, 20, true},
+	}
+
+	for _, tt := range tests {
+		tokens := scanner.ScanAll([]byte(tt.expr))
+		got, ok := evalCalc(tokens, tt.vars)
+		if ok != tt.ok {
+			t.Errorf(
+				"evalCalc(%q): ok=%v, want %v",
+				tt.expr, ok, tt.ok,
+			)
+			continue
+		}
+		if !ok {
+			continue
+		}
+		if math.Abs(got-tt.want) > 0.001 {
+			t.Errorf(
+				"evalCalc(%q) = %f, want %f",
+				tt.expr, got, tt.want,
+			)
+		}
 	}
 }
 

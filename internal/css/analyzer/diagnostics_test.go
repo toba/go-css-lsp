@@ -5,7 +5,7 @@ import "testing"
 func TestAnalyzeUnknownProperty(t *testing.T) {
 	src := []byte(`body { colo: red; }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	if _, ok := findDiagnostic(
 		diags, UnknownPropertyMessage("colo"),
@@ -17,7 +17,7 @@ func TestAnalyzeUnknownProperty(t *testing.T) {
 func TestAnalyzeKnownProperty(t *testing.T) {
 	src := []byte(`body { color: red; }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	if _, ok := findDiagnostic(
 		diags, UnknownPropertyMessage("color"),
@@ -29,7 +29,7 @@ func TestAnalyzeKnownProperty(t *testing.T) {
 func TestAnalyzeDuplicateProperty(t *testing.T) {
 	src := []byte(`body { color: red; color: blue; }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	if _, ok := findDiagnostic(
 		diags, DuplicatePropertyMessage("color"),
@@ -41,7 +41,7 @@ func TestAnalyzeDuplicateProperty(t *testing.T) {
 func TestAnalyzeEmptyRuleset(t *testing.T) {
 	src := []byte(`body { }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	if _, ok := findDiagnostic(
 		diags, EmptyRulesetMsg,
@@ -53,7 +53,7 @@ func TestAnalyzeEmptyRuleset(t *testing.T) {
 func TestAnalyzeUnknownAtRule(t *testing.T) {
 	src := []byte(`@foobar { }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	if _, ok := findDiagnostic(
 		diags, UnknownAtRuleMessage("foobar"),
@@ -65,7 +65,7 @@ func TestAnalyzeUnknownAtRule(t *testing.T) {
 func TestAnalyzeZeroWithUnit(t *testing.T) {
 	src := []byte(`body { margin: 0px; }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	found := false
 	for _, d := range diags {
@@ -82,7 +82,7 @@ func TestAnalyzeZeroWithUnit(t *testing.T) {
 func TestAnalyzeZeroWithUnit_TimeAllowed(t *testing.T) {
 	src := []byte(`body { transition-duration: 0s; }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	for _, d := range diags {
 		if d.Message == "unnecessary unit: '0s' can be written as '0'" {
@@ -94,7 +94,7 @@ func TestAnalyzeZeroWithUnit_TimeAllowed(t *testing.T) {
 func TestAnalyzeImportant(t *testing.T) {
 	src := []byte(`body { color: red !important; }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	if _, ok := findDiagnostic(
 		diags, AvoidImportantMsg,
@@ -106,7 +106,7 @@ func TestAnalyzeImportant(t *testing.T) {
 func TestAnalyzeVendorPrefix(t *testing.T) {
 	src := []byte(`body { -webkit-transform: rotate(0); }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	if _, ok := findDiagnostic(
 		diags, VendorPrefixMessage("-webkit-transform"),
@@ -118,7 +118,7 @@ func TestAnalyzeVendorPrefix(t *testing.T) {
 func TestAnalyzeCustomProperty(t *testing.T) {
 	src := []byte(`:root { --my-color: blue; }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	if _, ok := findDiagnostic(
 		diags, UnknownPropertyMessage("--my-color"),
@@ -134,7 +134,7 @@ func TestAnalyzeNesting_NoFalsePositives(t *testing.T) {
 	.child { font-size: 14px; }
 }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	// Should not flag nested selectors as unknown properties
 	for _, d := range diags {
@@ -147,7 +147,7 @@ func TestAnalyzeNesting_NoFalsePositives(t *testing.T) {
 func TestAnalyzeNesting_NestedNotEmpty(t *testing.T) {
 	src := []byte(`.parent { &:hover { color: blue; } }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	// Parent has a nested rule, so it's not empty
 	if _, ok := findDiagnostic(
@@ -160,7 +160,7 @@ func TestAnalyzeNesting_NestedNotEmpty(t *testing.T) {
 func TestAnalyzeNesting_NestedAtRule(t *testing.T) {
 	src := []byte(`.parent { @media (hover) { color: blue; } }`)
 	ss := parseCSS(t, src)
-	diags := Analyze(ss, src)
+	diags := Analyze(ss, src, LintOptions{})
 
 	// Should not produce unknown at-rule for @media
 	if _, ok := findDiagnostic(

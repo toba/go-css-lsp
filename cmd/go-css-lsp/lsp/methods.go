@@ -68,8 +68,9 @@ type NotificationMessage[T any] struct {
 // ServerSettings holds server-specific configuration from
 // initializationOptions.
 type ServerSettings struct {
-	FormatMode string `json:"formatMode"`
-	PrintWidth int    `json:"printWidth"`
+	FormatMode           string `json:"formatMode"`
+	PrintWidth           int    `json:"printWidth"`
+	ExperimentalFeatures string `json:"experimentalFeatures"`
 }
 
 // InitializeParams holds parameters for initialize request.
@@ -182,6 +183,8 @@ type CompletionItem struct {
 	Detail        string         `json:"detail,omitempty"`
 	Documentation *MarkupContent `json:"documentation,omitempty"`
 	InsertText    string         `json:"insertText,omitempty"`
+	Tags          []int          `json:"tags,omitempty"`
+	Deprecated    bool           `json:"deprecated,omitempty"`
 }
 
 // CompletionList represents a list of completion items.
@@ -428,6 +431,7 @@ type HoverParams struct {
 // HoverResult for textDocument/hover response.
 type HoverResult struct {
 	Contents MarkupContent `json:"contents"`
+	Range    *Range        `json:"range,omitempty"`
 }
 
 // CompletionParams for textDocument/completion.

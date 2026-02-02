@@ -35,6 +35,25 @@ const (
 	HighlightWrite = 3
 )
 
+// ExperimentalMode controls how experimental CSS features are
+// reported.
+type ExperimentalMode int
+
+const (
+	// ExperimentalWarn emits a warning diagnostic (default).
+	ExperimentalWarn ExperimentalMode = iota
+	// ExperimentalIgnore suppresses experimental diagnostics
+	// and completion tags.
+	ExperimentalIgnore
+	// ExperimentalError treats experimental features as errors.
+	ExperimentalError
+)
+
+// LintOptions configures analyzer behavior.
+type LintOptions struct {
+	Experimental ExperimentalMode
+}
+
 // Diagnostic represents a diagnostic message.
 type Diagnostic struct {
 	Message   string
@@ -52,4 +71,6 @@ type CompletionItem struct {
 	Detail        string
 	Documentation string
 	InsertText    string
+	Tags          []int
+	Deprecated    bool
 }

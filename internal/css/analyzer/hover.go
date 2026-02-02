@@ -8,55 +8,244 @@ import (
 	"github.com/toba/go-css-lsp/internal/css/scanner"
 )
 
+// HoverResult holds hover content and an optional byte-offset
+// range for the hovered span. When RangeStart < RangeEnd the
+// editor should highlight that range instead of using its own
+// word detection.
+type HoverResult struct {
+	Content    string
+	RangeStart int
+	RangeEnd   int
+	Found      bool
+}
+
 // Hover returns markdown hover content for the given byte
 // offset.
 func Hover(
 	ss *parser.Stylesheet,
 	src []byte,
 	offset int,
-) (string, bool) {
+) HoverResult {
 	if ss == nil {
-		return "", false
+		return HoverResult{}
 	}
 
 	tok := tokenAtOffset(ss, offset)
 	if tok == nil {
 		// Check selectors for pseudo-classes/elements
-		return hoverSelector(ss, offset)
+		content, found := hoverSelector(ss, offset)
+		return HoverResult{Content: content, Found: found}
 	}
 
 	switch tok.Kind {
 	case scanner.Ident:
-		return hoverIdent(ss, tok, offset)
+		return hoverIdent(ss, src, tok, offset)
 	case scanner.AtKeyword:
-		return hoverAtKeyword(tok)
+		content, found := hoverAtKeyword(tok)
+		return HoverResult{Content: content, Found: found}
 	case scanner.Function:
-		return hoverFunction(tok)
+		// Check for var() function — return custom prop hover
+		if strings.ToLower(tok.Value) == VarFunctionName {
+			return hoverVarFunction(ss, src, tok, offset)
+		}
+		content, found := hoverFunction(tok)
+		return HoverResult{Content: content, Found: found}
 	}
 
-	return "", false
+	return HoverResult{}
 }
 
 func hoverIdent(
 	ss *parser.Stylesheet,
+	src []byte,
 	tok *scanner.Token,
 	offset int,
-) (string, bool) {
+) HoverResult {
+	decl := declarationAtOffset(ss, offset)
+
 	// Check if it's a property name
-	node, _ := nodeAtOffset(ss, offset)
-	if decl, ok := node.(*parser.Declaration); ok {
-		if decl.Property.Offset == tok.Offset {
-			return hoverProperty(tok.Value)
+	if decl != nil && decl.Property.Offset == tok.Offset {
+		if IsCustomProperty(tok.Value) {
+			return hoverCustomProperty(
+				ss, src, tok.Value,
+				tok.Offset, tok.End,
+			)
 		}
+		content, found := hoverProperty(tok.Value)
+		return HoverResult{
+			Content: content, Found: found,
+		}
+	}
+
+	// Check for var() reference: custom property ident
+	// inside a var() call
+	if decl != nil && IsCustomProperty(tok.Value) &&
+		decl.Value != nil {
+		return hoverVarReference(
+			ss, src, decl, tok,
+		)
 	}
 
 	// Check if it's a known value keyword
 	prop := data.LookupProperty(tok.Value)
 	if prop != nil {
-		return hoverProperty(tok.Value)
+		content, found := hoverProperty(tok.Value)
+		return HoverResult{Content: content, Found: found}
 	}
 
-	return "", false
+	return HoverResult{}
+}
+
+// declarationAtOffset finds the Declaration node enclosing
+// the given offset, or nil.
+func declarationAtOffset(
+	ss *parser.Stylesheet,
+	offset int,
+) *parser.Declaration {
+	var result *parser.Declaration
+	parser.Walk(ss, func(n parser.Node) bool {
+		if n.Offset() > offset || n.End() < offset {
+			return false
+		}
+		if d, ok := n.(*parser.Declaration); ok {
+			result = d
+		}
+		return true
+	})
+	return result
+}
+
+// hoverCustomProperty returns hover content for a custom
+// property declaration, with a range covering the property
+// name token.
+func hoverCustomProperty(
+	ss *parser.Stylesheet,
+	src []byte,
+	name string,
+	start, end int,
+) HoverResult {
+	var b strings.Builder
+	b.WriteString("`")
+	b.WriteString(name)
+	b.WriteString("`")
+
+	// Find the declared value
+	parser.Walk(ss, func(n parser.Node) bool {
+		decl, ok := n.(*parser.Declaration)
+		if !ok {
+			return true
+		}
+		if decl.Property.Value == name &&
+			decl.Value != nil {
+			valText := strings.TrimSpace(
+				string(src[decl.Value.Offset():decl.Value.End()]),
+			)
+			if valText != "" {
+				b.WriteString("\n\n")
+				b.WriteString(valText)
+			}
+			return false
+		}
+		return true
+	})
+
+	return HoverResult{
+		Content:    b.String(),
+		RangeStart: start,
+		RangeEnd:   end,
+		Found:      true,
+	}
+}
+
+// hoverVarReference returns hover for a --custom-property ident
+// inside a var() call, with a range covering the full var(...)
+// expression.
+func hoverVarReference(
+	ss *parser.Stylesheet,
+	src []byte,
+	decl *parser.Declaration,
+	tok *scanner.Token,
+) HoverResult {
+	tokens := decl.Value.Tokens
+	for i, t := range tokens {
+		if t.Kind != scanner.Function ||
+			strings.ToLower(t.Value) != VarFunctionName {
+			continue
+		}
+		// Find the ident token inside this var()
+		for j := i + 1; j < len(tokens); j++ {
+			if tokens[j].Kind == scanner.Whitespace {
+				continue
+			}
+			if tokens[j].Kind == scanner.Ident &&
+				IsCustomProperty(tokens[j].Value) &&
+				tokens[j].Offset == tok.Offset {
+				// Found a match — build the range from
+				// var( to closing )
+				varStart := t.Offset
+				varEnd := tokens[j].End
+				for k := j + 1; k < len(tokens); k++ {
+					if tokens[k].Kind == scanner.ParenClose {
+						varEnd = tokens[k].End
+						break
+					}
+				}
+				return hoverCustomProperty(
+					ss, src, tok.Value,
+					varStart, varEnd,
+				)
+			}
+			break
+		}
+	}
+	return HoverResult{}
+}
+
+// hoverVarFunction handles hover when the cursor is on the
+// "var" function token itself. It finds the custom property
+// ident inside and returns hover with range covering the whole
+// var(...) expression.
+func hoverVarFunction(
+	ss *parser.Stylesheet,
+	src []byte,
+	funcTok *scanner.Token,
+	offset int,
+) HoverResult {
+	// Find the declaration containing this token
+	decl := declarationAtOffset(ss, offset)
+	if decl == nil || decl.Value == nil {
+		return HoverResult{}
+	}
+
+	tokens := decl.Value.Tokens
+	for i, t := range tokens {
+		if t.Offset != funcTok.Offset {
+			continue
+		}
+		// Find ident inside this var()
+		for j := i + 1; j < len(tokens); j++ {
+			if tokens[j].Kind == scanner.Whitespace {
+				continue
+			}
+			if tokens[j].Kind == scanner.Ident &&
+				IsCustomProperty(tokens[j].Value) {
+				varStart := t.Offset
+				varEnd := tokens[j].End
+				for k := j + 1; k < len(tokens); k++ {
+					if tokens[k].Kind == scanner.ParenClose {
+						varEnd = tokens[k].End
+						break
+					}
+				}
+				return hoverCustomProperty(
+					ss, src, tokens[j].Value,
+					varStart, varEnd,
+				)
+			}
+			break
+		}
+	}
+	return HoverResult{}
 }
 
 func hoverProperty(name string) (string, bool) {
@@ -74,6 +263,10 @@ func hoverProperty(name string) (string, bool) {
 	b.WriteString(prop.Name)
 	b.WriteString("**\n\n")
 	b.WriteString(prop.Description)
+
+	if prop.IsExperimental() {
+		b.WriteString("\n\n*Experimental — limited browser support*")
+	}
 
 	if len(prop.Values) > 0 {
 		b.WriteString("\n\nValues: `")

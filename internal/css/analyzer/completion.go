@@ -12,30 +12,32 @@ func Complete(
 	ss *parser.Stylesheet,
 	src []byte,
 	offset int,
+	opts LintOptions,
 ) []CompletionItem {
 	if ss == nil {
 		return nil
 	}
 
+	tag := opts.Experimental != ExperimentalIgnore
 	ctx := determineContext(ss, src, offset)
 
 	switch ctx.kind {
 	case contextNone:
 		return nil
 	case contextProperty:
-		return completeProperties(ctx.prefix)
+		return completeProperties(ctx.prefix, tag)
 	case contextValue:
 		return completeValues(ctx.propertyName, ctx.prefix)
 	case contextAtRule:
-		return completeAtRules(ctx.prefix)
+		return completeAtRules(ctx.prefix, tag)
 	case contextPseudoClass:
-		return completePseudoClasses(ctx.prefix)
+		return completePseudoClasses(ctx.prefix, tag)
 	case contextPseudoElement:
-		return completePseudoElements(ctx.prefix)
+		return completePseudoElements(ctx.prefix, tag)
 	case contextSelector:
 		return completeSelectorStart(ctx.prefix)
 	default:
-		return completeTopLevel(ctx.prefix)
+		return completeTopLevel(ctx.prefix, tag)
 	}
 }
 
@@ -150,7 +152,9 @@ func determineContext(
 	}
 }
 
-func completeProperties(prefix string) []CompletionItem {
+func completeProperties(
+	prefix string, tagExperimental bool,
+) []CompletionItem {
 	var items []CompletionItem
 	prefix = strings.ToLower(prefix)
 
@@ -159,13 +163,17 @@ func completeProperties(prefix string) []CompletionItem {
 			!strings.HasPrefix(prop.Name, prefix) {
 			continue
 		}
-		items = append(items, CompletionItem{
+		item := CompletionItem{
 			Label:         prop.Name,
 			Kind:          KindProperty,
 			Detail:        prop.Description,
 			Documentation: prop.MDN,
 			InsertText:    prop.Name + ": ",
-		})
+		}
+		if tagExperimental && prop.IsExperimental() {
+			item.Detail = "(experimental) " + item.Detail
+		}
+		items = append(items, item)
 	}
 
 	return items
@@ -233,7 +241,9 @@ func completeValues(
 	return items
 }
 
-func completeAtRules(prefix string) []CompletionItem {
+func completeAtRules(
+	prefix string, tagExperimental bool,
+) []CompletionItem {
 	var items []CompletionItem
 	prefix = strings.ToLower(prefix)
 
@@ -242,18 +252,22 @@ func completeAtRules(prefix string) []CompletionItem {
 			!strings.HasPrefix(rule.Name, prefix) {
 			continue
 		}
-		items = append(items, CompletionItem{
+		item := CompletionItem{
 			Label:  "@" + rule.Name,
 			Kind:   KindKeyword,
 			Detail: rule.Description,
-		})
+		}
+		if tagExperimental && rule.IsExperimental() {
+			item.Detail = "(experimental) " + item.Detail
+		}
+		items = append(items, item)
 	}
 
 	return items
 }
 
 func completePseudoClasses(
-	prefix string,
+	prefix string, tagExperimental bool,
 ) []CompletionItem {
 	var items []CompletionItem
 	prefix = strings.ToLower(prefix)
@@ -263,18 +277,22 @@ func completePseudoClasses(
 			!strings.HasPrefix(pc.Name, prefix) {
 			continue
 		}
-		items = append(items, CompletionItem{
+		item := CompletionItem{
 			Label:  ":" + pc.Name,
 			Kind:   KindKeyword,
 			Detail: pc.Description,
-		})
+		}
+		if tagExperimental && pc.IsExperimental() {
+			item.Detail = "(experimental) " + item.Detail
+		}
+		items = append(items, item)
 	}
 
 	return items
 }
 
 func completePseudoElements(
-	prefix string,
+	prefix string, tagExperimental bool,
 ) []CompletionItem {
 	var items []CompletionItem
 	prefix = strings.ToLower(prefix)
@@ -284,11 +302,15 @@ func completePseudoElements(
 			!strings.HasPrefix(pe.Name, prefix) {
 			continue
 		}
-		items = append(items, CompletionItem{
+		item := CompletionItem{
 			Label:  "::" + pe.Name,
 			Kind:   KindKeyword,
 			Detail: pe.Description,
-		})
+		}
+		if tagExperimental && pe.IsExperimental() {
+			item.Detail = "(experimental) " + item.Detail
+		}
+		items = append(items, item)
 	}
 
 	return items
@@ -324,9 +346,11 @@ func completeSelectorStart(
 	return items
 }
 
-func completeTopLevel(prefix string) []CompletionItem {
+func completeTopLevel(
+	prefix string, tagExperimental bool,
+) []CompletionItem {
 	items := completeSelectorStart(prefix)
-	items = append(items, completeAtRules(prefix)...)
+	items = append(items, completeAtRules(prefix, tagExperimental)...)
 	return items
 }
 

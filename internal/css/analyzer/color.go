@@ -78,7 +78,8 @@ func findColorsInTokens(
 ) []DocumentColor {
 	var colors []DocumentColor
 
-	for i, tok := range tokens {
+	for i := 0; i < len(tokens); i++ {
+		tok := tokens[i]
 		switch tok.Kind {
 		case scanner.Hash:
 			if c, ok := parseHexColor(tok.Value); ok {
@@ -107,9 +108,12 @@ func findColorsInTokens(
 				"lab", "lch",
 				"oklab", "oklch":
 				if dc, ok := parseColorFunction(
-					name, tokens[i:], src,
+					name, tokens[i:], src, resolver,
 				); ok {
 					colors = append(colors, dc)
+					// Skip past the closing paren to
+					// avoid matching inner tokens.
+					i = skipPastCloseParen(tokens, i)
 				}
 			case "var":
 				if resolver == nil {
@@ -119,12 +123,35 @@ func findColorsInTokens(
 					tokens[i:], resolver,
 				); ok {
 					colors = append(colors, dc)
+					i = skipPastCloseParen(tokens, i)
 				}
 			}
 		}
 	}
 
 	return colors
+}
+
+// skipPastCloseParen advances past the matching close paren for
+// the function token at tokens[start]. Returns the index of the
+// closing paren (the loop will increment past it).
+func skipPastCloseParen(
+	tokens []scanner.Token,
+	start int,
+) int {
+	depth := 1
+	for j := start + 1; j < len(tokens); j++ {
+		switch tokens[j].Kind {
+		case scanner.Function, scanner.ParenOpen:
+			depth++
+		case scanner.ParenClose:
+			depth--
+			if depth == 0 {
+				return j
+			}
+		}
+	}
+	return start
 }
 
 // resolveVarColor attempts to resolve a var() call to a color
@@ -291,8 +318,16 @@ func hexByte(s string) (int, bool) {
 func parseColorFunction(
 	name string,
 	tokens []scanner.Token,
-	_ []byte,
+	src []byte,
+	resolver VariableResolver,
 ) (DocumentColor, bool) {
+	// Check for relative color syntax: func(from <origin> ...)
+	if isRelativeColor(tokens) {
+		return parseRelativeColor(
+			name, tokens, src, resolver,
+		)
+	}
+
 	// Collect numeric arguments until closing paren.
 	startPos := tokens[0].Offset
 	var endPos int
@@ -762,6 +797,525 @@ func clamp01(v float64) float64 {
 		return 1
 	}
 	return v
+}
+
+// --- Relative color syntax support ---
+
+// srgbToLinear inverts the sRGB gamma curve.
+func srgbToLinear(c float64) float64 {
+	if c <= 0.04045 {
+		return c / 12.92
+	}
+	return math.Pow((c+0.055)/1.055, 2.4)
+}
+
+// srgbToXYZ converts linear sRGB to CIE XYZ (D65).
+func srgbToXYZ(
+	r, g, b float64,
+) (float64, float64, float64) {
+	rl := srgbToLinear(r)
+	gl := srgbToLinear(g)
+	bl := srgbToLinear(b)
+
+	x := 0.4124564*rl + 0.3575761*gl + 0.1804375*bl
+	y := 0.2126729*rl + 0.7151522*gl + 0.0721750*bl
+	z := 0.0193339*rl + 0.1191920*gl + 0.9503041*bl
+
+	return x, y, z
+}
+
+// srgbToLab converts sRGB [0,1] to CIE Lab.
+func srgbToLab(
+	r, g, b float64,
+) (float64, float64, float64) {
+	x, y, z := srgbToXYZ(r, g, b)
+
+	// D65 white point
+	x /= 0.95047
+	z /= 1.08883
+
+	const epsilon = 216.0 / 24389.0
+	const kappa = 24389.0 / 27.0
+
+	f := func(t float64) float64 {
+		if t > epsilon {
+			return math.Cbrt(t)
+		}
+		return (kappa*t + 16.0) / 116.0
+	}
+
+	fx := f(x)
+	fy := f(y)
+	fz := f(z)
+
+	lVal := 116.0*fy - 16.0
+	aVal := 500.0 * (fx - fy)
+	bVal := 200.0 * (fy - fz)
+
+	return lVal, aVal, bVal
+}
+
+// srgbToOklab converts sRGB [0,1] to Oklab.
+func srgbToOklab(
+	r, g, b float64,
+) (float64, float64, float64) {
+	rl := srgbToLinear(r)
+	gl := srgbToLinear(g)
+	bl := srgbToLinear(b)
+
+	l := 0.4122214708*rl + 0.5363325363*gl + 0.0514459929*bl
+	m := 0.2119034982*rl + 0.6806995451*gl + 0.1073969566*bl
+	s := 0.0883024619*rl + 0.2817188376*gl + 0.6299787005*bl
+
+	l = math.Cbrt(l)
+	m = math.Cbrt(m)
+	s = math.Cbrt(s)
+
+	lVal := 0.2104542553*l + 0.7936177850*m - 0.0040720468*s
+	aVal := 1.9779984951*l - 2.4285922050*m + 0.4505937099*s
+	bVal := 0.0259040371*l + 0.7827717662*m - 0.8086757660*s
+
+	return lVal, aVal, bVal
+}
+
+// colorToRGB decomposes sRGB Color to [r,g,b,alpha] in
+// RGB native ranges (r,g,b: 0-255).
+func colorToRGB(c Color) [4]float64 {
+	return [4]float64{
+		c.Red * 255, c.Green * 255, c.Blue * 255, c.Alpha,
+	}
+}
+
+// colorToHSL decomposes sRGB Color to [h,s,l,alpha] in
+// HSL native ranges (h: 0-360, s,l: 0-100).
+func colorToHSL(c Color) [4]float64 {
+	h, s, l := rgbToHSL(c.Red, c.Green, c.Blue)
+	return [4]float64{h * 360, s * 100, l * 100, c.Alpha}
+}
+
+// colorToHWB decomposes sRGB Color to [h,w,b,alpha] in
+// HWB native ranges (h: 0-360, w,b: 0-100).
+func colorToHWB(c Color) [4]float64 {
+	h, _, _ := rgbToHSL(c.Red, c.Green, c.Blue)
+	w := math.Min(c.Red, math.Min(c.Green, c.Blue))
+	bk := 1 - math.Max(c.Red, math.Max(c.Green, c.Blue))
+	return [4]float64{h * 360, w * 100, bk * 100, c.Alpha}
+}
+
+// colorToLab decomposes sRGB Color to [L,a,b,alpha] in
+// CIE Lab native ranges.
+func colorToLab(c Color) [4]float64 {
+	l, a, b := srgbToLab(c.Red, c.Green, c.Blue)
+	return [4]float64{l, a, b, c.Alpha}
+}
+
+// colorToLCH decomposes sRGB Color to [L,C,H,alpha] in
+// CIE LCH native ranges.
+func colorToLCH(c Color) [4]float64 {
+	l, a, b := srgbToLab(c.Red, c.Green, c.Blue)
+	ch := math.Sqrt(a*a + b*b)
+	h := math.Atan2(b, a) * 180 / math.Pi
+	if h < 0 {
+		h += 360
+	}
+	return [4]float64{l, ch, h, c.Alpha}
+}
+
+// colorToOklab decomposes sRGB Color to [L,a,b,alpha] in
+// Oklab native ranges.
+func colorToOklab(c Color) [4]float64 {
+	l, a, b := srgbToOklab(c.Red, c.Green, c.Blue)
+	return [4]float64{l, a, b, c.Alpha}
+}
+
+// colorToOklch decomposes sRGB Color to [L,C,H,alpha] in
+// Oklch native ranges.
+func colorToOklch(c Color) [4]float64 {
+	l, a, b := srgbToOklab(c.Red, c.Green, c.Blue)
+	ch := math.Sqrt(a*a + b*b)
+	h := math.Atan2(b, a) * 180 / math.Pi
+	if h < 0 {
+		h += 360
+	}
+	return [4]float64{l, ch, h, c.Alpha}
+}
+
+// colorSpaceChannels maps color function names to their channel
+// name identifiers.
+var colorSpaceChannels = map[string][]string{
+	"rgb":   {"r", "g", "b", "alpha"},
+	"rgba":  {"r", "g", "b", "alpha"},
+	"hsl":   {"h", "s", "l", "alpha"},
+	"hsla":  {"h", "s", "l", "alpha"},
+	"hwb":   {"h", "w", "b", "alpha"},
+	"lab":   {"l", "a", "b", "alpha"},
+	"lch":   {"l", "c", "h", "alpha"},
+	"oklab": {"l", "a", "b", "alpha"},
+	"oklch": {"l", "c", "h", "alpha"},
+}
+
+// colorSpaceDecompose maps color function names to their
+// decomposition functions.
+var colorSpaceDecompose = map[string]func(Color) [4]float64{
+	"rgb":   colorToRGB,
+	"rgba":  colorToRGB,
+	"hsl":   colorToHSL,
+	"hsla":  colorToHSL,
+	"hwb":   colorToHWB,
+	"lab":   colorToLab,
+	"lch":   colorToLCH,
+	"oklab": colorToOklab,
+	"oklch": colorToOklch,
+}
+
+// isRelativeColor checks if tokens[1] (after function open) is
+// the "from" keyword, indicating relative color syntax.
+func isRelativeColor(tokens []scanner.Token) bool {
+	for i := 1; i < len(tokens); i++ {
+		if tokens[i].Kind == scanner.Whitespace {
+			continue
+		}
+		return tokens[i].Kind == scanner.Ident &&
+			strings.ToLower(tokens[i].Value) == "from"
+	}
+	return false
+}
+
+// parseOriginColor parses the origin color in a relative color
+// expression. It handles: hex, named color, color function, or
+// var(). Returns the color, the token index after the origin,
+// and success.
+func parseOriginColor(
+	tokens []scanner.Token,
+	start int,
+	src []byte,
+	resolver VariableResolver,
+) (Color, int, bool) {
+	for i := start; i < len(tokens); i++ {
+		tok := tokens[i]
+		if tok.Kind == scanner.Whitespace {
+			continue
+		}
+
+		switch tok.Kind {
+		case scanner.Hash:
+			c, ok := parseHexColor(tok.Value)
+			if !ok {
+				return Color{}, i, false
+			}
+			return c, i + 1, true
+
+		case scanner.Ident:
+			c, ok := namedColorMap[strings.ToLower(tok.Value)]
+			if !ok {
+				return Color{}, i, false
+			}
+			return c, i + 1, true
+
+		case scanner.Function:
+			name := strings.ToLower(tok.Value)
+			switch name {
+			case "rgb", "rgba", "hsl", "hsla", "hwb",
+				"lab", "lch", "oklab", "oklch":
+				// Find matching close paren for this
+				// nested function.
+				depth := 1
+				for j := i + 1; j < len(tokens); j++ {
+					switch tokens[j].Kind {
+					case scanner.Function, scanner.ParenOpen:
+						depth++
+					case scanner.ParenClose:
+						depth--
+						if depth == 0 {
+							// Parse the sub-function
+							dc, ok := parseColorFunction(
+								name,
+								tokens[i:j+1],
+								src,
+								resolver,
+							)
+							if !ok {
+								return Color{}, j + 1, false
+							}
+							return dc.Color, j + 1, true
+						}
+					}
+				}
+				return Color{}, i, false
+
+			case "var":
+				if resolver == nil {
+					return Color{}, i, false
+				}
+				// Find matching close paren.
+				depth := 1
+				for j := i + 1; j < len(tokens); j++ {
+					switch tokens[j].Kind {
+					case scanner.Function, scanner.ParenOpen:
+						depth++
+					case scanner.ParenClose:
+						depth--
+						if depth == 0 {
+							dc, ok := resolveVarColor(
+								tokens[i:j+1],
+								resolver,
+							)
+							if !ok {
+								return Color{}, j + 1, false
+							}
+							return dc.Color, j + 1, true
+						}
+					}
+				}
+				return Color{}, i, false
+			}
+		}
+
+		return Color{}, i, false
+	}
+	return Color{}, start, false
+}
+
+// parseRelativeColor parses a relative color expression like
+// rgb(from red r g b / 50%).
+func parseRelativeColor(
+	name string,
+	tokens []scanner.Token,
+	src []byte,
+	resolver VariableResolver,
+) (DocumentColor, bool) {
+	channels, ok := colorSpaceChannels[name]
+	if !ok {
+		return DocumentColor{}, false
+	}
+	decompose, ok := colorSpaceDecompose[name]
+	if !ok {
+		return DocumentColor{}, false
+	}
+
+	startPos := tokens[0].Offset
+
+	// Skip past the "from" keyword.
+	i := 1
+	for i < len(tokens) && tokens[i].Kind == scanner.Whitespace {
+		i++
+	}
+	if i >= len(tokens) ||
+		tokens[i].Kind != scanner.Ident ||
+		strings.ToLower(tokens[i].Value) != "from" {
+		return DocumentColor{}, false
+	}
+	i++
+
+	// Parse origin color.
+	origin, nextIdx, ok := parseOriginColor(
+		tokens, i, src, resolver,
+	)
+	if !ok {
+		return DocumentColor{}, false
+	}
+	i = nextIdx
+
+	// Decompose origin into channel variables.
+	vals := decompose(origin)
+	channelVars := make(map[string]float64, 4)
+	for ci, ch := range channels {
+		channelVars[ch] = vals[ci]
+	}
+
+	// Parse 3 channel expressions + optional alpha.
+	args := make([]float64, 0, 4)
+	isPercent := make([]bool, 0, 4)
+	hasSlash := false
+
+	for len(args) < 3 && i < len(tokens) {
+		if tokens[i].Kind == scanner.Whitespace {
+			i++
+			continue
+		}
+		if tokens[i].Kind == scanner.ParenClose {
+			break
+		}
+
+		val, pct, newI, ok := parseChannelExpr(
+			tokens, i, channelVars,
+		)
+		if !ok {
+			return DocumentColor{}, false
+		}
+		args = append(args, val)
+		isPercent = append(isPercent, pct)
+		i = newI
+	}
+
+	if len(args) < 3 {
+		return DocumentColor{}, false
+	}
+
+	// Optional: / alpha
+	for i < len(tokens) && tokens[i].Kind == scanner.Whitespace {
+		i++
+	}
+	if i < len(tokens) &&
+		tokens[i].Kind == scanner.Delim &&
+		tokens[i].Value == "/" {
+		hasSlash = true
+		i++
+		for i < len(tokens) &&
+			tokens[i].Kind == scanner.Whitespace {
+			i++
+		}
+		if i < len(tokens) {
+			val, pct, newI, ok := parseChannelExpr(
+				tokens, i, channelVars,
+			)
+			if !ok {
+				return DocumentColor{}, false
+			}
+			args = append(args, val)
+			isPercent = append(isPercent, pct)
+			i = newI
+		}
+	}
+
+	// Find closing paren.
+	var endPos int
+	for i < len(tokens) {
+		if tokens[i].Kind == scanner.ParenClose {
+			endPos = tokens[i].End
+			break
+		}
+		i++
+	}
+	if endPos == 0 {
+		return DocumentColor{}, false
+	}
+
+	// Build color via existing build functions.
+	var c Color
+	switch name {
+	case "rgb", "rgba":
+		c, ok = buildRGB(args, isPercent, hasSlash)
+	case "hsl", "hsla":
+		c, ok = buildHSL(args, isPercent, hasSlash)
+	case "hwb":
+		c, ok = buildHWB(args, isPercent, hasSlash)
+	case "lab":
+		c, ok = buildLab(args, isPercent)
+	case "lch":
+		c, ok = buildLCH(args, isPercent)
+	case "oklab":
+		c, ok = buildOklab(args, isPercent)
+	case "oklch":
+		c, ok = buildOklch(args, isPercent)
+	default:
+		return DocumentColor{}, false
+	}
+
+	if !ok {
+		return DocumentColor{}, false
+	}
+
+	return DocumentColor{
+		Color:    c,
+		StartPos: startPos,
+		EndPos:   endPos,
+	}, true
+}
+
+// parseChannelExpr parses a single channel value: a number,
+// percentage, channel ident, "none", or calc() expression.
+// Returns value, whether it's a percentage, the next token
+// index, and success.
+func parseChannelExpr(
+	tokens []scanner.Token,
+	start int,
+	channelVars map[string]float64,
+) (float64, bool, int, bool) {
+	i := start
+	for i < len(tokens) && tokens[i].Kind == scanner.Whitespace {
+		i++
+	}
+	if i >= len(tokens) {
+		return 0, false, i, false
+	}
+
+	tok := tokens[i]
+
+	// Number literal
+	if tok.Kind == scanner.Number {
+		v, err := strconv.ParseFloat(tok.Value, 64)
+		if err != nil {
+			return 0, false, i, false
+		}
+		return v, false, i + 1, true
+	}
+
+	// Percentage literal
+	if tok.Kind == scanner.Percentage {
+		v, err := strconv.ParseFloat(tok.Value, 64)
+		if err != nil {
+			return 0, false, i, false
+		}
+		return v, true, i + 1, true
+	}
+
+	// "none" keyword
+	if tok.Kind == scanner.Ident &&
+		strings.ToLower(tok.Value) == "none" {
+		return 0, false, i + 1, true
+	}
+
+	// Channel name ident
+	if tok.Kind == scanner.Ident {
+		if v, ok := channelVars[strings.ToLower(tok.Value)]; ok {
+			return v, false, i + 1, true
+		}
+		return 0, false, i, false
+	}
+
+	// calc() function
+	if tok.Kind == scanner.Function &&
+		strings.ToLower(tok.Value) == "calc" {
+		// Collect tokens until matching close paren.
+		depth := 1
+		j := i + 1
+		var calcTokens []scanner.Token
+		for j < len(tokens) {
+			if tokens[j].Kind == scanner.Function ||
+				tokens[j].Kind == scanner.ParenOpen {
+				depth++
+			} else if tokens[j].Kind == scanner.ParenClose {
+				depth--
+				if depth == 0 {
+					break
+				}
+			}
+			calcTokens = append(calcTokens, tokens[j])
+			j++
+		}
+		if depth != 0 {
+			return 0, false, j, false
+		}
+		val, ok := evalCalc(calcTokens, channelVars)
+		if !ok {
+			return 0, false, j, false
+		}
+		return val, false, j + 1, true
+	}
+
+	// Unary minus before number/ident
+	if tok.Kind == scanner.Delim && tok.Value == "-" {
+		val, pct, newI, ok := parseChannelExpr(
+			tokens, i+1, channelVars,
+		)
+		if !ok {
+			return 0, false, newI, false
+		}
+		return -val, pct, newI, true
+	}
+
+	return 0, false, i, false
 }
 
 // ColorPresentation returns alternative representations of a

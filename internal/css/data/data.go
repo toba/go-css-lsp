@@ -10,25 +10,47 @@ type Property struct {
 	Description string
 	MDN         string
 	Values      []string // common value keywords
+	Status      string   // "obsolete", "experimental", "nonstandard", or "" (standard)
 }
+
+// IsDeprecated returns true for obsolete properties.
+func (p *Property) IsDeprecated() bool { return p.Status == "obsolete" }
+
+// IsExperimental returns true for experimental properties.
+func (p *Property) IsExperimental() bool { return p.Status == "experimental" }
+
+// IsNonstandard returns true for nonstandard properties.
+func (p *Property) IsNonstandard() bool { return p.Status == "nonstandard" }
 
 // AtRuleDef describes a CSS at-rule.
 type AtRuleDef struct {
 	Name        string
 	Description string
+	Status      string
 }
+
+// IsExperimental returns true for experimental at-rules.
+func (a AtRuleDef) IsExperimental() bool { return a.Status == "experimental" }
 
 // PseudoClass describes a CSS pseudo-class.
 type PseudoClass struct {
 	Name        string
 	Description string
+	Status      string
 }
+
+// IsExperimental returns true for experimental pseudo-classes.
+func (p PseudoClass) IsExperimental() bool { return p.Status == "experimental" }
 
 // PseudoElement describes a CSS pseudo-element.
 type PseudoElement struct {
 	Name        string
 	Description string
+	Status      string
 }
+
+// IsExperimental returns true for experimental pseudo-elements.
+func (p PseudoElement) IsExperimental() bool { return p.Status == "experimental" }
 
 // Function describes a CSS function.
 type Function struct {

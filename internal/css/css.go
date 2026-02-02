@@ -22,9 +22,10 @@ func Parse(src []byte) *ParseResult {
 // Diagnostics returns diagnostic messages for the given CSS.
 func Diagnostics(
 	src []byte,
+	opts analyzer.LintOptions,
 ) ([]analyzer.Diagnostic, *parser.Stylesheet) {
 	result := Parse(src)
-	diags := analyzer.Analyze(result.Stylesheet, src)
+	diags := analyzer.Analyze(result.Stylesheet, src, opts)
 
 	// Add parse errors as diagnostics
 	for _, e := range result.Errors {
@@ -48,7 +49,7 @@ func Hover(
 	ss *parser.Stylesheet,
 	src []byte,
 	line, char int,
-) (content string, found bool) {
+) analyzer.HoverResult {
 	offset := LineCharToOffset(src, line, char)
 	return analyzer.Hover(ss, src, offset)
 }
@@ -193,9 +194,10 @@ func Completions(
 	ss *parser.Stylesheet,
 	src []byte,
 	line, char int,
+	opts analyzer.LintOptions,
 ) []analyzer.CompletionItem {
 	offset := LineCharToOffset(src, line, char)
-	return analyzer.Complete(ss, src, offset)
+	return analyzer.Complete(ss, src, offset, opts)
 }
 
 // VarReferenceAt returns the CSS variable name at the given

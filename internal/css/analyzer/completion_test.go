@@ -11,7 +11,7 @@ func TestCompletePropertyNames(t *testing.T) {
 	ss, _ := parser.Parse(src)
 
 	// offset 10 is after "col" inside block
-	items := Complete(ss, src, 10)
+	items := Complete(ss, src, 10, LintOptions{})
 
 	found := false
 	for _, item := range items {
@@ -32,7 +32,7 @@ func TestCompleteAtRules(t *testing.T) {
 	ss, _ := parser.Parse(src)
 
 	// offset 3 is after "@me"
-	items := Complete(ss, src, 3)
+	items := Complete(ss, src, 3, LintOptions{})
 
 	found := false
 	for _, item := range items {
@@ -50,7 +50,7 @@ func TestCompleteEmpty(t *testing.T) {
 	src := []byte("")
 	ss, _ := parser.Parse(src)
 
-	items := Complete(ss, src, 0)
+	items := Complete(ss, src, 0, LintOptions{})
 	// Should return top-level completions without panic
 	if items == nil {
 		t.Error("expected non-nil completions")
@@ -62,7 +62,7 @@ func TestCompleteNoSuggestionsInBlockComment(t *testing.T) {
 	ss, _ := parser.Parse(src)
 
 	// offset 6 is after ":ho" inside the comment
-	items := Complete(ss, src, 6)
+	items := Complete(ss, src, 6, LintOptions{})
 	if len(items) > 0 {
 		t.Errorf(
 			"expected no completions inside comment, got %d",
@@ -77,7 +77,7 @@ func TestCompleteNoSuggestionsInBlockComment_AtRule(
 	src := []byte("/* @me */")
 	ss, _ := parser.Parse(src)
 
-	items := Complete(ss, src, 6)
+	items := Complete(ss, src, 6, LintOptions{})
 	if len(items) > 0 {
 		t.Errorf(
 			"expected no completions inside comment, got %d",
@@ -93,7 +93,7 @@ func TestCompleteNoSuggestionsInMultilineComment(
 	ss, _ := parser.Parse(src)
 
 	// offset 15 is after ":hov" inside the comment
-	items := Complete(ss, src, 15)
+	items := Complete(ss, src, 15, LintOptions{})
 	if len(items) > 0 {
 		t.Errorf(
 			"expected no completions inside comment, got %d",
@@ -108,7 +108,7 @@ func TestCompleteAfterClosedComment(t *testing.T) {
 	ss, _ := parser.Parse(src)
 
 	// offset 17 is after "@me"
-	items := Complete(ss, src, 17)
+	items := Complete(ss, src, 17, LintOptions{})
 	found := false
 	for _, item := range items {
 		if item.Label == "@media" {
@@ -128,7 +128,7 @@ func TestCompleteNotInString(t *testing.T) {
 	src := []byte("a:ho")
 	ss, _ := parser.Parse(src)
 
-	items := Complete(ss, src, 4)
+	items := Complete(ss, src, 4, LintOptions{})
 	found := false
 	for _, item := range items {
 		if item.Label == ":hover" {

@@ -26,17 +26,19 @@ func hasVendorPrefix(name string) bool {
 func Analyze(
 	ss *parser.Stylesheet,
 	src []byte,
+	opts LintOptions,
 ) []Diagnostic {
 	if ss == nil {
 		return nil
 	}
-	a := &diagAnalyzer{src: src}
+	a := &diagAnalyzer{src: src, opts: opts}
 	a.analyzeStylesheet(ss)
 	return a.diags
 }
 
 type diagAnalyzer struct {
 	src   []byte
+	opts  LintOptions
 	diags []Diagnostic
 }
 
@@ -111,6 +113,27 @@ func (a *diagAnalyzer) analyzeDeclaration(
 			EndChar:   endChar,
 			Severity:  SeverityWarning,
 		})
+	} else if a.opts.Experimental != ExperimentalIgnore {
+		if prop := data.LookupProperty(propName); prop != nil && prop.IsExperimental() {
+			sev := SeverityWarning
+			if a.opts.Experimental == ExperimentalError {
+				sev = SeverityError
+			}
+			line, char := OffsetToLineChar(
+				a.src, decl.Property.Offset,
+			)
+			endLine, endChar := OffsetToLineChar(
+				a.src, decl.Property.End,
+			)
+			a.diags = append(a.diags, Diagnostic{
+				Message:   ExperimentalPropertyMessage(propName),
+				StartLine: line,
+				StartChar: char,
+				EndLine:   endLine,
+				EndChar:   endChar,
+				Severity:  sev,
+			})
+		}
 	}
 
 	// Check for duplicate properties

@@ -29,24 +29,28 @@ type cssProperty struct {
 	Description json.RawMessage `json:"description"`
 	References  []cssReference  `json:"references"`
 	Values      []cssValue      `json:"values"`
+	Status      string          `json:"status"`
 }
 
 type cssAtDirective struct {
 	Name        string          `json:"name"`
 	Description json.RawMessage `json:"description"`
 	References  []cssReference  `json:"references"`
+	Status      string          `json:"status"`
 }
 
 type cssPseudoClass struct {
 	Name        string          `json:"name"`
 	Description json.RawMessage `json:"description"`
 	References  []cssReference  `json:"references"`
+	Status      string          `json:"status"`
 }
 
 type cssPseudoElem struct {
 	Name        string          `json:"name"`
 	Description json.RawMessage `json:"description"`
 	References  []cssReference  `json:"references"`
+	Status      string          `json:"status"`
 }
 
 type cssReference struct {
@@ -91,6 +95,10 @@ func mdnURL(refs []cssReference) string {
 	return ""
 }
 
+func isDroppedStatus(status string) bool {
+	return status == "obsolete" || status == "nonstandard"
+}
+
 func isVendorPrefixed(name string) bool {
 	// Strip leading @, :, or :: then check for -.
 	s := strings.TrimLeft(name, "@:")
@@ -129,10 +137,10 @@ func main() {
 }
 
 func generateProperties(outDir string, props []cssProperty) {
-	// Filter and sort.
+	// Filter out vendor-prefixed and obsolete/nonstandard.
 	var filtered []cssProperty
 	for _, p := range props {
-		if !isVendorPrefixed(p.Name) {
+		if !isVendorPrefixed(p.Name) && !isDroppedStatus(p.Status) {
 			filtered = append(filtered, p)
 		}
 	}
@@ -155,6 +163,9 @@ func generateProperties(outDir string, props []cssProperty) {
 		}
 		if mdn != "" {
 			b.WriteString("\t\tMDN:         " + goStr(mdn) + ",\n")
+		}
+		if p.Status != "" {
+			b.WriteString("\t\tStatus:      " + goStr(p.Status) + ",\n")
 		}
 
 		// Collect value keywords (skip vendor-prefixed).
@@ -203,7 +214,7 @@ func generateProperties(outDir string, props []cssProperty) {
 func generateAtRules(outDir string, directives []cssAtDirective) {
 	var filtered []cssAtDirective
 	for _, a := range directives {
-		if !isVendorPrefixed(a.Name) {
+		if !isVendorPrefixed(a.Name) && !isDroppedStatus(a.Status) {
 			filtered = append(filtered, a)
 		}
 	}
@@ -224,6 +235,9 @@ func generateAtRules(outDir string, directives []cssAtDirective) {
 		b.WriteString("Name: " + goStr(name))
 		if desc != "" {
 			b.WriteString(", Description: " + goStr(desc))
+		}
+		if a.Status != "" {
+			b.WriteString(", Status: " + goStr(a.Status))
 		}
 		b.WriteString("},\n")
 	}
@@ -246,7 +260,7 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 	// Filter and sort pseudo-classes.
 	var filteredClasses []cssPseudoClass
 	for _, p := range classes {
-		if !isVendorPrefixed(p.Name) {
+		if !isVendorPrefixed(p.Name) && !isDroppedStatus(p.Status) {
 			filteredClasses = append(filteredClasses, p)
 		}
 	}
@@ -257,7 +271,7 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 	// Filter and sort pseudo-elements.
 	var filteredElements []cssPseudoElem
 	for _, p := range elements {
-		if !isVendorPrefixed(p.Name) {
+		if !isVendorPrefixed(p.Name) && !isDroppedStatus(p.Status) {
 			filteredElements = append(filteredElements, p)
 		}
 	}
@@ -282,6 +296,9 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 		if desc != "" {
 			b.WriteString(", Description: " + goStr(desc))
 		}
+		if p.Status != "" {
+			b.WriteString(", Status: " + goStr(p.Status))
+		}
 		b.WriteString("},\n")
 	}
 	b.WriteString("}\n\n")
@@ -299,6 +316,9 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 		b.WriteString("Name: " + goStr(name))
 		if desc != "" {
 			b.WriteString(", Description: " + goStr(desc))
+		}
+		if p.Status != "" {
+			b.WriteString(", Status: " + goStr(p.Status))
 		}
 		b.WriteString("},\n")
 	}

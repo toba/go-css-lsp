@@ -82,10 +82,6 @@ var Properties = []Property{
 		},
 	},
 	{
-		Name:        "align-tracks",
-		Description: "The align-tracks CSS property sets the alignment in the masonry axis for grid containers that have masonry in their block axis.",
-	},
-	{
 		Name:        "alignment-baseline",
 		Description: "The alignment-baseline CSS property specifies the specific baseline used to align the box's text and inline-level contents. Baseline alignment is the relationship among the baselines of multiple alignment subjects within an alignment context. When performing baseline alignment, the alignment-baseline property value specifies which baseline of the box is aligned to the corresponding baseline of its alignment context.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/alignment-baseline",
@@ -662,67 +658,10 @@ var Properties = []Property{
 		Values: []string{"auto"},
 	},
 	{
-		Name:        "box-align",
-		Description: "The box-align CSS property specifies how an element aligns its contents across its layout in a perpendicular direction. The effect of the property is only visible if there is extra space in the box.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-align",
-		Values: []string{
-			"start",
-			"center",
-			"end",
-			"baseline",
-			"stretch",
-		},
-	},
-	{
 		Name:        "box-decoration-break",
 		Description: "Specifies whether individual boxes are treated as broken pieces of one continuous box, or whether each box is individually wrapped with the border and padding.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-decoration-break",
 		Values: []string{"clone", "slice"},
-	},
-	{
-		Name:        "box-direction",
-		Description: "The box-direction CSS property specifies whether a box lays out its contents normally (from the top or left edge), or in reverse (from the bottom or right edge).",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-direction",
-		Values: []string{"normal", "reverse", "inherit"},
-	},
-	{
-		Name:        "box-flex",
-		Description: "The -moz-box-flex and -webkit-box-flex CSS properties specify how a -moz-box or -webkit-box grows to fill the box that contains it, in the direction of the containing box's layout.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-flex",
-	},
-	{
-		Name:        "box-flex-group",
-		Description: "The box-flex-group CSS property assigns the flexbox's child elements to a flex group.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-flex-group",
-	},
-	{
-		Name:        "box-lines",
-		Description: "The box-lines CSS property determines whether the box may have a single or multiple lines (rows for horizontally oriented boxes, columns for vertically oriented boxes).",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-lines",
-		Values: []string{"single", "multiple"},
-	},
-	{
-		Name:        "box-ordinal-group",
-		Description: "The box-ordinal-group CSS property assigns the flexbox's child elements to an ordinal group.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-ordinal-group",
-	},
-	{
-		Name:        "box-orient",
-		Description: "The box-orient CSS property specifies whether an element lays out its contents horizontally or vertically.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-orient",
-		Values: []string{
-			"horizontal",
-			"vertical",
-			"inline-axis",
-			"block-axis",
-			"inherit",
-		},
-	},
-	{
-		Name:        "box-pack",
-		Description: "The -moz-box-pack and -webkit-box-pack CSS properties specify how a -moz-box or -webkit-box packs its contents in the direction of its layout. The effect of this is only visible if there is extra space in the box.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/box-pack",
-		Values: []string{"start", "center", "end", "justify"},
 	},
 	{
 		Name:        "box-shadow",
@@ -801,12 +740,6 @@ var Properties = []Property{
 		Description: "Indicates which sides of an element's box(es) may not be adjacent to an earlier floating box. The 'clear' property does not consider floats inside the element itself or in other block formatting contexts.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/clear",
 		Values: []string{"both", "left", "none", "right"},
-	},
-	{
-		Name:        "clip",
-		Description: "Deprecated. Use the 'clip-path' property when support allows. Defines the visible portion of an element's box.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/clip",
-		Values: []string{"auto", "rect()"},
 	},
 	{
 		Name:        "clip-path",
@@ -1120,6 +1053,7 @@ var Properties = []Property{
 		Name:        "field-sizing",
 		Description: "The field-sizing CSS property enables you to control the sizing behavior of elements that are given a default preferred size, such as form control elements. This property enables you to override the default sizing behavior, allowing form controls to adjust in size to fit their contents.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/field-sizing",
+		Status:      "experimental",
 		Values: []string{"content", "fixed"},
 	},
 	{
@@ -1475,29 +1409,6 @@ var Properties = []Property{
 		Values: []string{"none"},
 	},
 	{
-		Name:        "font-smooth",
-		Description: "The font-smooth CSS property controls the application of anti-aliasing when fonts are rendered.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-smooth",
-	},
-	{
-		Name:        "font-stretch",
-		Description: "Selects a normal, condensed, or expanded face from a font family.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-stretch",
-		Values: []string{
-			"condensed",
-			"expanded",
-			"extra-condensed",
-			"extra-expanded",
-			"narrower",
-			"normal",
-			"semi-condensed",
-			"semi-expanded",
-			"ultra-condensed",
-			"ultra-expanded",
-			"wider",
-		},
-	},
-	{
 		Name:        "font-style",
 		Description: "Allows italic or oblique faces to be selected. Italic forms are generally cursive in nature while oblique faces are typically sloped versions of the regular face.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-style",
@@ -1513,6 +1424,7 @@ var Properties = []Property{
 		Name:        "font-synthesis-position",
 		Description: "The font-synthesis-position CSS property lets you specify whether or not a browser may synthesize the subscript and superscript \"position\" typefaces when they are missing in a font family, while using font-variant-position to set the positions.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-synthesis-position",
+		Status:      "experimental",
 		Values: []string{"auto", "none"},
 	},
 	{
@@ -1659,6 +1571,7 @@ var Properties = []Property{
 	},
 	{
 		Name:        "font-width",
+		Status:      "experimental",
 	},
 	{
 		Name:        "forced-color-adjust",
@@ -1722,18 +1635,10 @@ var Properties = []Property{
 		Values: []string{"auto", "span"},
 	},
 	{
-		Name:        "grid-column-gap",
-		Description: "Specifies the gutters between grid columns. Replaced by 'column-gap' property.",
-	},
-	{
 		Name:        "grid-column-start",
 		Description: "Determine a grid item's size and location within the grid by contributing a line, a span, or nothing (automatic) to its grid placement.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/grid-column-start",
 		Values: []string{"auto", "span"},
-	},
-	{
-		Name:        "grid-gap",
-		Description: "Shorthand that specifies the gutters between grid columns and grid rows in one declaration. Replaced by 'gap' property.",
 	},
 	{
 		Name:        "grid-row",
@@ -1746,10 +1651,6 @@ var Properties = []Property{
 		Description: "Determine a grid item's size and location within the grid by contributing a line, a span, or nothing (automatic) to its grid placement.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/grid-row-end",
 		Values: []string{"auto", "span"},
-	},
-	{
-		Name:        "grid-row-gap",
-		Description: "Specifies the gutters between grid rows. Replaced by 'row-gap' property.",
 	},
 	{
 		Name:        "grid-row-start",
@@ -1853,17 +1754,7 @@ var Properties = []Property{
 	{
 		Name:        "image-resolution",
 		Description: "The image-resolution property specifies the intrinsic resolution of all raster images used in or on the element. It affects both content images (e.g. replaced elements and generated content) and decorative images (such as background-image). The intrinsic resolution of an image is used to determine the image’s intrinsic dimensions.",
-	},
-	{
-		Name:        "ime-mode",
-		Description: "Controls the state of the input method editor for text fields.",
-		Values: []string{
-			"active",
-			"auto",
-			"disabled",
-			"inactive",
-			"normal",
-		},
+		Status:      "experimental",
 	},
 	{
 		Name:        "inherits",
@@ -1878,6 +1769,7 @@ var Properties = []Property{
 	{
 		Name:        "initial-letter-align",
 		Description: "The initial-letter-align CSS property specifies the alignment of initial letters within a paragraph.",
+		Status:      "experimental",
 	},
 	{
 		Name:        "initial-value",
@@ -1928,6 +1820,7 @@ var Properties = []Property{
 		Name:        "interpolate-size",
 		Description: "The interpolate-size CSS property allows you to enable animations and transitions between a <length-percentage> value and an intrinsic size value such as auto, fit-content, or max-content.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/interpolate-size",
+		Status:      "experimental",
 		Values: []string{"numeric-only", "allow-keywords"},
 	},
 	{
@@ -2009,10 +1902,6 @@ var Properties = []Property{
 		},
 	},
 	{
-		Name:        "justify-tracks",
-		Description: "The justify-tracks CSS property sets the alignment in the masonry axis for grid containers that have masonry in their inline axis",
-	},
-	{
 		Name:        "kerning",
 		Description: "Indicates whether the user agent should adjust inter-glyph spacing based on kerning tables that are included in the relevant font or instead disable auto-kerning and set inter-character spacing to a specific length.",
 		Values: []string{"auto"},
@@ -2064,6 +1953,7 @@ var Properties = []Property{
 	{
 		Name:        "line-height-step",
 		Description: "The line-height-step CSS property defines the step units for line box heights. When the step unit is positive, line box heights are rounded up to the closest multiple of the unit. Negative values are invalid.",
+		Status:      "experimental",
 	},
 	{
 		Name:        "list-style",
@@ -2194,6 +2084,7 @@ var Properties = []Property{
 		Name:        "margin-trim",
 		Description: "The margin-trim property allows the container to trim the margins of its children where they adjoin the container’s edges.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/margin-trim",
+		Status:      "experimental",
 		Values: []string{"none", "in-flow", "all"},
 	},
 	{
@@ -2314,10 +2205,6 @@ var Properties = []Property{
 		Values: []string{"alpha", "luminance"},
 	},
 	{
-		Name:        "masonry-auto-flow",
-		Description: "The masonry-auto-flow CSS property modifies how items are placed when using masonry in CSS Grid Layout.",
-	},
-	{
 		Name:        "math-depth",
 		Description: "Describe a notion of \"depth\" for each element of a mathematical formula, with respect to the top-level container of that formula.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/math-depth",
@@ -2355,6 +2242,7 @@ var Properties = []Property{
 	{
 		Name:        "max-lines",
 		Description: "The max-lines property forces a break after a set number of lines",
+		Status:      "experimental",
 	},
 	{
 		Name:        "max-width",
@@ -2480,6 +2368,7 @@ var Properties = []Property{
 		Name:        "object-view-box",
 		Description: "Defines a rectangle as a viewable area (viewbox) within a replaced element, enabling the content of the replaced element to be zoomed or panned.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/object-view-box",
+		Status:      "experimental",
 	},
 	{
 		Name:        "offset",
@@ -2599,11 +2488,6 @@ var Properties = []Property{
 		},
 	},
 	{
-		Name:        "overflow-clip-box",
-		Description: "The overflow-clip-box CSS property specifies relative to which box the clipping happens when there is an overflow. It is short hand for the overflow-clip-box-inline and overflow-clip-box-block properties.",
-		Values: []string{"padding-box", "content-box"},
-	},
-	{
 		Name:        "overflow-clip-margin",
 		Description: "The overflow-clip-margin CSS property determines how far outside its bounds an element with overflow: clip may be painted before being clipped.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/overflow-clip-margin",
@@ -2642,6 +2526,7 @@ var Properties = []Property{
 		Name:        "overlay",
 		Description: "The overlay CSS property specifies whether an element appearing in the top layer (for example, a shown popover or modal {{htmlelement(\"dialog\")}} element) is actually rendered in the top layer. This property is only relevant within a list of transition-property values, and only if allow-discrete is set as the transition-behavior.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/overlay",
+		Status:      "experimental",
 		Values: []string{"none", "auto"},
 	},
 	{
@@ -2742,36 +2627,6 @@ var Properties = []Property{
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/page",
 	},
 	{
-		Name:        "page-break-after",
-		Description: "Defines rules for page breaks after an element.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/page-break-after",
-		Values: []string{
-			"always",
-			"auto",
-			"avoid",
-			"left",
-			"right",
-		},
-	},
-	{
-		Name:        "page-break-before",
-		Description: "Defines rules for page breaks before an element.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/page-break-before",
-		Values: []string{
-			"always",
-			"auto",
-			"avoid",
-			"left",
-			"right",
-		},
-	},
-	{
-		Name:        "page-break-inside",
-		Description: "Defines rules for page breaks inside an element.",
-		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/page-break-inside",
-		Values: []string{"auto", "avoid"},
-	},
-	{
 		Name:        "page-orientation",
 		Description: "The page-orientation CSS descriptor for the @page at-rule controls the rotation of a printed page. It handles the flow of content across pages when the orientation of a page is changed. This behavior differs from the size descriptor in that a user can define the direction in which to rotate the page.",
 	},
@@ -2864,6 +2719,7 @@ var Properties = []Property{
 		Name:        "position-visibility",
 		Description: "There are times when an element’s anchors are not appropriate for positioning the element with, and it would be better to simply not display the element at all. position-visibility provides several conditions where this could be the case.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/position-visibility",
+		Status:      "experimental",
 	},
 	{
 		Name:        "prefix",
@@ -2933,6 +2789,7 @@ var Properties = []Property{
 	{
 		Name:        "ruby-merge",
 		Description: "This property controls how ruby annotation boxes should be rendered when there are more than one in a ruby container box: whether each pair should be kept separate, the annotations should be collapsed and rendered as a group, or the separation should be determined based on the space available.",
+		Status:      "experimental",
 		Values: []string{"separate", "collapse", "auto"},
 	},
 	{
@@ -2975,6 +2832,7 @@ var Properties = []Property{
 	},
 	{
 		Name:        "scroll-initial-target",
+		Status:      "experimental",
 		Values: []string{"none", "nearest"},
 	},
 	{
@@ -3093,25 +2951,6 @@ var Properties = []Property{
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/scroll-snap-align",
 	},
 	{
-		Name:        "scroll-snap-coordinate",
-		Description: "Defines the x and y coordinate within the element which will align with the nearest ancestor scroll container's snap-destination for the respective axis.",
-		Values: []string{"none"},
-	},
-	{
-		Name:        "scroll-snap-destination",
-		Description: "Define the x and y coordinate within the scroll container's visual viewport which element snap points will align with.",
-	},
-	{
-		Name:        "scroll-snap-points-x",
-		Description: "Defines the positioning of snap points along the x axis of the scroll container it is applied to.",
-		Values: []string{"none", "repeat()"},
-	},
-	{
-		Name:        "scroll-snap-points-y",
-		Description: "Defines the positioning of snap points along the y axis of the scroll container it is applied to.",
-		Values: []string{"none", "repeat()"},
-	},
-	{
 		Name:        "scroll-snap-stop",
 		Description: "The scroll-snap-stop CSS property defines whether the scroll container is allowed to \"pass over\" possible snap positions.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/scroll-snap-stop",
@@ -3121,16 +2960,6 @@ var Properties = []Property{
 		Name:        "scroll-snap-type",
 		Description: "Defines how strictly snap points are enforced on the scroll container.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/scroll-snap-type",
-		Values: []string{"none", "mandatory", "proximity"},
-	},
-	{
-		Name:        "scroll-snap-type-x",
-		Description: "The scroll-snap-type-x CSS property defines how strictly snap points are enforced on the horizontal axis of the scroll container in case there is one.\n\nSpecifying any precise animations or physics used to enforce those snap points is not covered by this property but instead left up to the user agent.",
-		Values: []string{"none", "mandatory", "proximity"},
-	},
-	{
-		Name:        "scroll-snap-type-y",
-		Description: "The scroll-snap-type-y CSS property defines how strictly snap points are enforced on the vertical axis of the scroll container in case there is one.\n\nSpecifying any precise animations or physics used to enforce those snap points is not covered by this property but instead left up to the user agent.",
 		Values: []string{"none", "mandatory", "proximity"},
 	},
 	{
@@ -3254,6 +3083,7 @@ var Properties = []Property{
 	},
 	{
 		Name:        "stroke-color",
+		Status:      "experimental",
 	},
 	{
 		Name:        "stroke-dasharray",
@@ -3416,6 +3246,7 @@ var Properties = []Property{
 		Name:        "text-decoration-skip",
 		Description: "The text-decoration-skip CSS property specifies what parts of the element’s content any text decoration affecting the element must skip over. It controls all text decoration lines drawn by the element and also any text decoration lines drawn by its ancestors.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/text-decoration-skip",
+		Status:      "experimental",
 	},
 	{
 		Name:        "text-decoration-skip-ink",
@@ -3509,11 +3340,13 @@ var Properties = []Property{
 		Name:        "text-size-adjust",
 		Description: "The text-size-adjust CSS property controls the text inflation algorithm used on some smartphones and tablets. Other browsers will ignore this property.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/text-size-adjust",
+		Status:      "experimental",
 	},
 	{
 		Name:        "text-spacing-trim",
 		Description: "The text-spacing-trim CSS property controls the internal spacing set on Chinese/Japanese/Korean (CJK) punctuation characters between adjacent characters (kerning) and at the start or end of text lines.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/text-spacing-trim",
+		Status:      "experimental",
 		Values: []string{"space-all", "normal", "space-first", "trim-start"},
 	},
 	{
