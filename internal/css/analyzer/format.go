@@ -150,6 +150,12 @@ func (f *formatter) formatRulesetBody(rs *parser.Ruleset) {
 	for i, child := range rs.Children {
 		switch n := child.(type) {
 		case *parser.Declaration:
+			if i > 0 && (f.opts.Mode == FormatPreserve || f.opts.Mode == FormatDetect) {
+				f.writePreservedBlankLines(
+					rs.Children[i-1].End(),
+					n.Offset(),
+				)
+			}
 			f.formatDeclaration(n)
 		case *parser.Ruleset:
 			if i > 0 {

@@ -999,3 +999,41 @@ func TestFormat_BlankLineBeforeCommentInRuleset(t *testing.T) {
 		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s", result, expected)
 	}
 }
+
+func TestFormatDetect_PreservesBlankLineBetweenDeclarations(t *testing.T) {
+	src := []byte(`.button {
+  --button-icon-size: calc(var(--button-size) - var(--button-radius) * 2);
+
+  position: relative;
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := `.button {
+  --button-icon-size: calc(var(--button-size) - var(--button-radius) * 2);
+
+  position: relative;
+}
+`
+	if result != expected {
+		t.Errorf("got:\n%s\nwant:\n%s", result, expected)
+	}
+}
+
+func TestFormatPreserve_PreservesBlankLineBetweenDeclarations(t *testing.T) {
+	src := []byte(`.button {
+  color: red;
+
+  position: relative;
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, preserveOpts())
+	expected := `.button {
+  color: red;
+
+  position: relative;
+}
+`
+	if result != expected {
+		t.Errorf("got:\n%s\nwant:\n%s", result, expected)
+	}
+}
