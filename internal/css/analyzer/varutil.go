@@ -163,6 +163,92 @@ func FindVarReferenceAt(
 	return result
 }
 
+// FindVarReferenceWithRange is like FindVarReferenceAt but also
+// returns the start and end offsets of the full var(--name)
+// expression.
+func FindVarReferenceWithRange(
+	ss *parser.Stylesheet,
+	_ []byte,
+	offset int,
+) (name string, start, end int) {
+	parser.Walk(ss, func(n parser.Node) bool {
+		if name != "" {
+			return false
+		}
+
+		decl, ok := n.(*parser.Declaration)
+		if !ok {
+			return true
+		}
+		if decl.Value == nil {
+			return true
+		}
+
+		tokens := decl.Value.Tokens
+		for i, tok := range tokens {
+			if tok.Kind == scanner.Function &&
+				strings.ToLower(tok.Value) == VarFunctionName {
+				for j := i + 1; j < len(tokens); j++ {
+					if tokens[j].Kind == scanner.Whitespace {
+						continue
+					}
+					if tokens[j].Kind == scanner.Ident &&
+						IsCustomProperty(tokens[j].Value) {
+						varStart := tok.Offset
+						varEnd := tokens[j].End
+						for k := j + 1; k < len(tokens); k++ {
+							if tokens[k].Kind == scanner.ParenClose {
+								varEnd = tokens[k].End
+								break
+							}
+						}
+						if offset >= varStart && offset <= varEnd {
+							name = tokens[j].Value
+							start = varStart
+							end = varEnd
+							return false
+						}
+					}
+					break
+				}
+			}
+
+			// Check if cursor is directly on a --variable ident
+			// inside a var()
+			if tok.Kind == scanner.Ident &&
+				IsCustomProperty(tok.Value) &&
+				offset >= tok.Offset && offset <= tok.End {
+				if i > 0 {
+					for k := i - 1; k >= 0; k-- {
+						if tokens[k].Kind == scanner.Whitespace {
+							continue
+						}
+						if tokens[k].Kind == scanner.Function &&
+							strings.ToLower(tokens[k].Value) == VarFunctionName {
+							varStart := tokens[k].Offset
+							varEnd := tok.End
+							for m := i + 1; m < len(tokens); m++ {
+								if tokens[m].Kind == scanner.ParenClose {
+									varEnd = tokens[m].End
+									break
+								}
+							}
+							name = tok.Value
+							start = varStart
+							end = varEnd
+							return false
+						}
+						break
+					}
+				}
+			}
+		}
+		return true
+	})
+
+	return name, start, end
+}
+
 // ForEachVarUsage calls fn for each var(--name) usage token
 // matching the given name.
 func ForEachVarUsage(

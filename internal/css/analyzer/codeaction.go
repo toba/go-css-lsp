@@ -8,9 +8,14 @@ import (
 
 // CodeActionKind constants.
 const (
-	CodeActionQuickFix = "quickfix"
-	CodeActionRefactor = "refactor"
+	CodeActionQuickFix     = "quickfix"
+	CodeActionRefactor     = "refactor"
+	CodeActionSourceFixAll = "source.fixAll"
 )
+
+// UnnecessaryUnitPrefix is the message prefix for the
+// unnecessary unit diagnostic.
+const UnnecessaryUnitPrefix = "unnecessary unit: '"
 
 // CodeAction represents a code action (quick fix).
 type CodeAction struct {
@@ -106,6 +111,35 @@ func findSimilarProperties(name string) []string {
 		result[i] = candidates[i].name
 	}
 	return result
+}
+
+// FindFixAllActions returns quick-fix code actions for all
+// auto-fixable diagnostics.
+func FindFixAllActions(diags []Diagnostic) []CodeAction {
+	var actions []CodeAction
+	for _, d := range diags {
+		if a, ok := fixForDiagnostic(d); ok {
+			actions = append(actions, a)
+		}
+	}
+	return actions
+}
+
+// fixForDiagnostic returns a code action if the diagnostic is
+// auto-fixable.
+func fixForDiagnostic(d Diagnostic) (CodeAction, bool) {
+	if strings.HasPrefix(d.Message, UnnecessaryUnitPrefix) {
+		return CodeAction{
+			Title:       "Remove unnecessary unit",
+			Kind:        CodeActionQuickFix,
+			StartLine:   d.StartLine,
+			StartChar:   d.StartChar,
+			EndLine:     d.EndLine,
+			EndChar:     d.EndChar,
+			ReplaceWith: "0",
+		}, true
+	}
+	return CodeAction{}, false
 }
 
 // editDistance computes the Levenshtein distance between two

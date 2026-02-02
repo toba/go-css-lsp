@@ -45,13 +45,16 @@ func Diagnostics(
 }
 
 // Hover returns hover information for the given position.
+// An optional VariableResolver enables cross-file custom
+// property value lookup.
 func Hover(
 	ss *parser.Stylesheet,
 	src []byte,
 	line, char int,
+	resolvers ...analyzer.VariableResolver,
 ) analyzer.HoverResult {
 	offset := LineCharToOffset(src, line, char)
-	return analyzer.Hover(ss, src, offset)
+	return analyzer.Hover(ss, src, offset, resolvers...)
 }
 
 // DocumentColors returns all colors found in the CSS document.
@@ -150,6 +153,16 @@ func DocumentHighlights(
 	return analyzer.FindDocumentHighlights(ss, src, offset)
 }
 
+// FixAllActions returns code actions for all auto-fixable
+// diagnostics in the document.
+func FixAllActions(
+	src []byte,
+	opts analyzer.LintOptions,
+) []analyzer.CodeAction {
+	diags, _ := Diagnostics(src, opts)
+	return analyzer.FindFixAllActions(diags)
+}
+
 // CodeActions returns code actions for the given diagnostics
 // and color conversion refactors at the cursor position.
 func CodeActions(
@@ -184,7 +197,7 @@ func Definition(
 	ss *parser.Stylesheet,
 	src []byte,
 	line, char int,
-) (loc analyzer.Location, found bool) {
+) (analyzer.DefinitionResult, bool) {
 	offset := LineCharToOffset(src, line, char)
 	return analyzer.FindDefinition(ss, src, offset)
 }
@@ -218,6 +231,17 @@ func VarReferenceAt(
 ) string {
 	offset := LineCharToOffset(src, line, char)
 	return analyzer.FindVarReferenceAt(ss, src, offset)
+}
+
+// VarReferenceWithRange returns the CSS variable name and the
+// full var(--name) span at the given position.
+func VarReferenceWithRange(
+	ss *parser.Stylesheet,
+	src []byte,
+	line, char int,
+) (string, int, int) {
+	offset := LineCharToOffset(src, line, char)
+	return analyzer.FindVarReferenceWithRange(ss, src, offset)
 }
 
 // OffsetToLineChar converts a byte offset to line/character.

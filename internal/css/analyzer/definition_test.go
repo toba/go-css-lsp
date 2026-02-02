@@ -15,16 +15,23 @@ func TestFindDefinition_VarReference(t *testing.T) {
 	// .foo { color: var(--primary); }
 	// Position within var(--primary)
 	varOffset := indexOf(src, "var(--primary)")
-	loc, found := FindDefinition(ss, src, varOffset)
+	result, found := FindDefinition(ss, src, varOffset)
 
 	if !found {
 		t.Fatal("expected to find definition")
 	}
 
-	propText := string(src[loc.StartPos:loc.EndPos])
+	propText := string(src[result.TargetStart:result.TargetEnd])
 	if propText != "--primary" {
 		t.Errorf(
 			"expected --primary, got %q", propText,
+		)
+	}
+
+	originText := string(src[result.OriginStart:result.OriginEnd])
+	if originText != "var(--primary)" {
+		t.Errorf(
+			"expected var(--primary), got %q", originText,
 		)
 	}
 }
@@ -36,15 +43,22 @@ func TestFindDefinition_CursorOnVarName(t *testing.T) {
 
 	// Cursor directly on "--color" inside var()
 	varOffset := indexOf(src, "--color);")
-	loc, found := FindDefinition(ss, src, varOffset)
+	result, found := FindDefinition(ss, src, varOffset)
 
 	if !found {
 		t.Fatal("expected to find definition")
 	}
 
-	propText := string(src[loc.StartPos:loc.EndPos])
+	propText := string(src[result.TargetStart:result.TargetEnd])
 	if propText != "--color" {
 		t.Errorf("expected --color, got %q", propText)
+	}
+
+	originText := string(src[result.OriginStart:result.OriginEnd])
+	if originText != "var(--color)" {
+		t.Errorf(
+			"expected var(--color), got %q", originText,
+		)
 	}
 }
 

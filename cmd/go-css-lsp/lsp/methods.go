@@ -98,7 +98,7 @@ type ServerCapabilities struct {
 	DocumentSymbolProvider     bool                 `json:"documentSymbolProvider,omitempty"`
 	DefinitionProvider         bool                 `json:"definitionProvider,omitempty"`
 	ReferencesProvider         bool                 `json:"referencesProvider,omitempty"`
-	CodeActionProvider         bool                 `json:"codeActionProvider,omitempty"`
+	CodeActionProvider         *CodeActionOptions   `json:"codeActionProvider,omitempty"`
 	DocumentHighlightProvider  bool                 `json:"documentHighlightProvider,omitempty"`
 	FoldingRangeProvider       bool                 `json:"foldingRangeProvider,omitempty"`
 	DocumentLinkProvider       *DocumentLinkOptions `json:"documentLinkProvider,omitempty"`
@@ -217,13 +217,17 @@ func ProcessInitializeRequest(
 		Id:      req.Id,
 		Result: InitializeResult{
 			Capabilities: ServerCapabilities{
-				TextDocumentSync:           TextDocumentSyncFull,
-				HoverProvider:              true,
-				ColorProvider:              true,
-				DocumentSymbolProvider:     true,
-				DefinitionProvider:         true,
-				ReferencesProvider:         true,
-				CodeActionProvider:         true,
+				TextDocumentSync:       TextDocumentSyncFull,
+				HoverProvider:          true,
+				ColorProvider:          true,
+				DocumentSymbolProvider: true,
+				DefinitionProvider:     true,
+				ReferencesProvider:     true,
+				CodeActionProvider: &CodeActionOptions{
+					CodeActionKinds: []string{
+						"quickfix", "refactor", "source.fixAll",
+					},
+				},
 				DocumentHighlightProvider:  true,
 				FoldingRangeProvider:       true,
 				DocumentLinkProvider:       &DocumentLinkOptions{},
@@ -518,6 +522,15 @@ type LSPLocation struct {
 	Range Range  `json:"range"`
 }
 
+// LSPLocationLink represents a link between a source and
+// target location, with explicit origin selection range.
+type LSPLocationLink struct {
+	OriginSelectionRange *Range `json:"originSelectionRange,omitempty"`
+	TargetUri            string `json:"targetUri"`
+	TargetRange          Range  `json:"targetRange"`
+	TargetSelectionRange Range  `json:"targetSelectionRange"`
+}
+
 // CodeActionParams for textDocument/codeAction.
 type CodeActionParams struct {
 	TextDocument TextDocumentIdentifier `json:"textDocument"`
@@ -528,6 +541,7 @@ type CodeActionParams struct {
 // CodeActionContext carries diagnostics for code actions.
 type CodeActionContext struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
+	Only        []string     `json:"only,omitempty"`
 }
 
 // LSPCodeAction represents a code action response.
@@ -583,6 +597,11 @@ type DocumentFormattingParams struct {
 type FormattingOptions struct {
 	TabSize      int  `json:"tabSize"`
 	InsertSpaces bool `json:"insertSpaces"`
+}
+
+// CodeActionOptions describes code action provider capabilities.
+type CodeActionOptions struct {
+	CodeActionKinds []string `json:"codeActionKinds,omitempty"`
 }
 
 // RenameOptions for rename provider capability.

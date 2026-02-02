@@ -366,6 +366,175 @@ func (f *formatter) writeValue(v *parser.Value) {
 }
 
 func (f *formatter) formatAtRule(ar *parser.AtRule) {
+	if ar.Block != nil && atRuleHasOnlyDeclarations(ar) {
+		switch f.opts.Mode {
+		case FormatCompact:
+			if f.formatAtRuleCompact(ar) {
+				return
+			}
+		case FormatPreserve:
+			if f.formatAtRulePreserve(ar) {
+				return
+			}
+		case FormatDetect:
+			if f.formatAtRuleDetect(ar) {
+				return
+			}
+		}
+	}
+
+	f.formatAtRuleExpanded(ar)
+}
+
+// atRuleHasOnlyDeclarations reports whether an at-rule's block
+// contains only declarations (no nested rulesets, at-rules, or
+// comments).
+func atRuleHasOnlyDeclarations(ar *parser.AtRule) bool {
+	if ar.Block == nil {
+		return false
+	}
+	for _, child := range ar.Block.Children {
+		if _, ok := child.(*parser.Declaration); !ok {
+			return false
+		}
+	}
+	return len(ar.Block.Children) > 0
+}
+
+// writeAtRulePreludeTo writes the at-rule prelude to a builder.
+func (f *formatter) writeAtRulePreludeTo(
+	sb *strings.Builder,
+	ar *parser.AtRule,
+) {
+	sb.WriteByte('@')
+	sb.WriteString(ar.Name)
+	if len(ar.Prelude) > 0 {
+		sb.WriteByte(' ')
+		prevEnd := -1
+		for _, tok := range ar.Prelude {
+			if tok.Kind == scanner.Whitespace {
+				continue
+			}
+			if prevEnd >= 0 && tok.Offset > prevEnd {
+				sb.WriteByte(' ')
+			}
+			sb.WriteString(
+				string(f.src[tok.Offset:tok.End]),
+			)
+			prevEnd = tok.End
+		}
+	}
+}
+
+// buildAtRuleSingleLine renders an at-rule as a single-line
+// string: "@media (...) { decl; decl; }".
+func (f *formatter) buildAtRuleSingleLine(
+	ar *parser.AtRule,
+) string {
+	var sb strings.Builder
+	f.writeAtRulePreludeTo(&sb, ar)
+	sb.WriteString(" { ")
+	first := true
+	for _, child := range ar.Block.Children {
+		decl, ok := child.(*parser.Declaration)
+		if !ok {
+			continue
+		}
+		if !first {
+			sb.WriteByte(' ')
+		}
+		first = false
+		sb.WriteString(decl.Property.Value)
+		sb.WriteString(": ")
+		if decl.Value != nil {
+			f.writeValueTo(&sb, decl.Value)
+		}
+		if decl.Important {
+			sb.WriteString(" !important")
+		}
+		sb.WriteByte(';')
+	}
+	sb.WriteString(" }")
+	return sb.String()
+}
+
+// formatAtRuleCompact tries to render the at-rule on a single
+// line. Returns true if it succeeded.
+func (f *formatter) formatAtRuleCompact(
+	ar *parser.AtRule,
+) bool {
+	line := f.buildAtRuleSingleLine(ar)
+	if f.indentWidth()+len(line) <= f.opts.PrintWidth {
+		f.writeIndent()
+		f.buf.WriteString(line)
+		f.buf.WriteByte('\n')
+		return true
+	}
+	return false
+}
+
+// formatAtRulePreserve keeps original single/multi-line layout.
+// Returns true if rendered as single line.
+func (f *formatter) formatAtRulePreserve(
+	ar *parser.AtRule,
+) bool {
+	if f.isOriginalSingleLine(ar.StartPos, ar.EndPos) {
+		line := f.buildAtRuleSingleLine(ar)
+		if f.indentWidth()+len(line) <= f.opts.PrintWidth {
+			f.writeIndent()
+			f.buf.WriteString(line)
+			f.buf.WriteByte('\n')
+			return true
+		}
+	}
+	return false
+}
+
+// formatAtRuleDetect infers single-line intent from whether
+// the first child is on the same line as the opening brace.
+// Returns true if rendered as single line.
+func (f *formatter) formatAtRuleDetect(
+	ar *parser.AtRule,
+) bool {
+	if f.isAtRuleFirstChildInline(ar) {
+		line := f.buildAtRuleSingleLine(ar)
+		if f.indentWidth()+len(line) <= f.opts.PrintWidth {
+			f.writeIndent()
+			f.buf.WriteString(line)
+			f.buf.WriteByte('\n')
+			return true
+		}
+	}
+	return false
+}
+
+// isAtRuleFirstChildInline reports whether the first child of
+// an at-rule block is on the same line as the opening brace.
+func (f *formatter) isAtRuleFirstChildInline(
+	ar *parser.AtRule,
+) bool {
+	if ar.Block == nil || len(ar.Block.Children) == 0 {
+		return true
+	}
+	// Find the opening brace after the prelude.
+	bracePos := -1
+	start := ar.StartPos
+	for i := start; i < len(f.src); i++ {
+		if f.src[i] == '{' {
+			bracePos = i
+			break
+		}
+	}
+	if bracePos < 0 {
+		return false
+	}
+	firstOffset := ar.Block.Children[0].Offset()
+	return !bytes.ContainsRune(
+		f.src[bracePos:firstOffset], '\n',
+	)
+}
+
+func (f *formatter) formatAtRuleExpanded(ar *parser.AtRule) {
 	f.writeIndent()
 	f.buf.WriteByte('@')
 	f.buf.WriteString(ar.Name)

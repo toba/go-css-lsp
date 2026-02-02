@@ -20,14 +20,21 @@ type HoverResult struct {
 }
 
 // Hover returns markdown hover content for the given byte
-// offset.
+// offset. An optional VariableResolver enables cross-file
+// custom property value lookup.
 func Hover(
 	ss *parser.Stylesheet,
 	src []byte,
 	offset int,
+	resolvers ...VariableResolver,
 ) HoverResult {
 	if ss == nil {
 		return HoverResult{}
+	}
+
+	var resolver VariableResolver
+	if len(resolvers) > 0 {
+		resolver = resolvers[0]
 	}
 
 	tok := tokenAtOffset(ss, offset)
@@ -39,14 +46,16 @@ func Hover(
 
 	switch tok.Kind {
 	case scanner.Ident:
-		return hoverIdent(ss, src, tok, offset)
+		return hoverIdent(ss, src, tok, offset, resolver)
 	case scanner.AtKeyword:
 		content, found := hoverAtKeyword(tok)
 		return HoverResult{Content: content, Found: found}
 	case scanner.Function:
 		// Check for var() function — return custom prop hover
 		if strings.ToLower(tok.Value) == VarFunctionName {
-			return hoverVarFunction(ss, src, tok, offset)
+			return hoverVarFunction(
+				ss, src, tok, offset, resolver,
+			)
 		}
 		content, found := hoverFunction(tok)
 		return HoverResult{Content: content, Found: found}
@@ -60,6 +69,7 @@ func hoverIdent(
 	src []byte,
 	tok *scanner.Token,
 	offset int,
+	resolver VariableResolver,
 ) HoverResult {
 	decl := declarationAtOffset(ss, offset)
 
@@ -69,6 +79,7 @@ func hoverIdent(
 			return hoverCustomProperty(
 				ss, src, tok.Value,
 				tok.Offset, tok.End,
+				resolver,
 			)
 		}
 		content, found := hoverProperty(tok.Value)
@@ -82,7 +93,7 @@ func hoverIdent(
 	if decl != nil && IsCustomProperty(tok.Value) &&
 		decl.Value != nil {
 		return hoverVarReference(
-			ss, src, decl, tok,
+			ss, src, decl, tok, resolver,
 		)
 	}
 
@@ -117,19 +128,22 @@ func declarationAtOffset(
 
 // hoverCustomProperty returns hover content for a custom
 // property declaration, with a range covering the property
-// name token.
+// name token. When the variable is not found in the current
+// file, the resolver (if non-nil) is consulted.
 func hoverCustomProperty(
 	ss *parser.Stylesheet,
 	src []byte,
 	name string,
 	start, end int,
+	resolver VariableResolver,
 ) HoverResult {
 	var b strings.Builder
 	b.WriteString("`")
 	b.WriteString(name)
 	b.WriteString("`")
 
-	// Find the declared value
+	// Find the declared value in the current file
+	var found bool
 	parser.Walk(ss, func(n parser.Node) bool {
 		decl, ok := n.(*parser.Declaration)
 		if !ok {
@@ -143,11 +157,20 @@ func hoverCustomProperty(
 			if valText != "" {
 				b.WriteString("\n\n")
 				b.WriteString(valText)
+				found = true
 			}
 			return false
 		}
 		return true
 	})
+
+	// Fall back to workspace index
+	if !found && resolver != nil {
+		if val, ok := resolver.ResolveVariable(name); ok {
+			b.WriteString("\n\n")
+			b.WriteString(val)
+		}
+	}
 
 	return HoverResult{
 		Content:    b.String(),
@@ -165,6 +188,7 @@ func hoverVarReference(
 	src []byte,
 	decl *parser.Declaration,
 	tok *scanner.Token,
+	resolver VariableResolver,
 ) HoverResult {
 	tokens := decl.Value.Tokens
 	for i, t := range tokens {
@@ -193,6 +217,7 @@ func hoverVarReference(
 				return hoverCustomProperty(
 					ss, src, tok.Value,
 					varStart, varEnd,
+					resolver,
 				)
 			}
 			break
@@ -210,6 +235,7 @@ func hoverVarFunction(
 	src []byte,
 	funcTok *scanner.Token,
 	offset int,
+	resolver VariableResolver,
 ) HoverResult {
 	// Find the declaration containing this token
 	decl := declarationAtOffset(ss, offset)
@@ -240,6 +266,7 @@ func hoverVarFunction(
 				return hoverCustomProperty(
 					ss, src, tokens[j].Value,
 					varStart, varEnd,
+					resolver,
 				)
 			}
 			break

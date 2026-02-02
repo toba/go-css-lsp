@@ -188,6 +188,57 @@ func TestHoverVarReference(t *testing.T) {
 	}
 }
 
+func TestHoverVarReferenceWithResolver(t *testing.T) {
+	// Variable is NOT defined in the same file
+	src := []byte(`.a { color: var(--brand); }`)
+	ss, errs := parser.Parse(src)
+	if len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	resolver := mapResolver{"--brand": "blue"}
+
+	varExpr := "var(--brand)"
+	varIdx := strings.Index(string(src), varExpr)
+	identIdx := strings.Index(
+		string(src[varIdx:]), "--brand",
+	) + varIdx
+
+	hr := Hover(ss, src, identIdx+1, resolver)
+	if !hr.Found {
+		t.Fatal("expected hover for cross-file var()")
+	}
+	if !strings.Contains(hr.Content, "--brand") {
+		t.Errorf(
+			"expected property name, got %q", hr.Content,
+		)
+	}
+	if !strings.Contains(hr.Content, "blue") {
+		t.Errorf(
+			"expected resolved value, got %q", hr.Content,
+		)
+	}
+	// Range should cover entire var(--brand)
+	if hr.RangeStart != varIdx ||
+		hr.RangeEnd != varIdx+len(varExpr) {
+		t.Errorf(
+			"range = [%d,%d], want [%d,%d]",
+			hr.RangeStart, hr.RangeEnd,
+			varIdx, varIdx+len(varExpr),
+		)
+	}
+}
+
+// mapResolver is a simple VariableResolver for testing.
+type mapResolver map[string]string
+
+func (m mapResolver) ResolveVariable(
+	name string,
+) (string, bool) {
+	v, ok := m[name]
+	return v, ok
+}
+
 func TestHoverVarFunctionToken(t *testing.T) {
 	src := []byte(
 		`:root { --brand: blue; }

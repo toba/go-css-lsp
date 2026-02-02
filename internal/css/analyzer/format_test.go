@@ -676,6 +676,103 @@ func TestFormatDetect_SelectorListInlineExceedsWidth(t *testing.T) {
 	}
 }
 
+// --- At-rule single-line tests ---
+
+func TestFormatDetect_AtRuleInlineFirstPropFits(t *testing.T) {
+	// Nested @media with first prop inline → single line
+	src := []byte(`.foo {
+  @media (width <= 767px) { margin-left: 0; }
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := ".foo {\n  @media (width <= 767px) { margin-left: 0; }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_AtRuleFirstPropOnNewLine(t *testing.T) {
+	// Nested @media with first prop on new line → stays multi-line
+	src := []byte(`.foo {
+  @media (width <= 767px) {
+    margin-left: 0;
+  }
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(80))
+	expected := ".foo {\n  @media (width <= 767px) {\n    margin-left: 0;\n  }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatDetect_AtRuleInlineExceedsPrintWidth(t *testing.T) {
+	// Nested @media inline but exceeds print-width → multi-line
+	src := []byte(`.foo {
+  @media (width <= 767px) { margin-left: 0; }
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, detectOpts(30))
+	expected := ".foo {\n  @media (width <= 767px) {\n    margin-left: 0;\n  }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatCompact_AtRuleSingleLine(t *testing.T) {
+	// Compact mode: nested at-rule with only declarations → single line
+	src := []byte(`.foo {
+  @media (width <= 767px) {
+    margin-left: 0;
+  }
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, compactOpts(80))
+	// Parent has nested rules so it stays expanded; @media collapses
+	expected := ".foo {\n  @media (width <= 767px) { margin-left: 0; }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatPreserve_AtRuleSingleLine(t *testing.T) {
+	// Preserve mode: at-rule originally single-line → stays single line
+	src := []byte(`.foo {
+  @media (width <= 767px) { margin-left: 0; }
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		Mode:         FormatPreserve,
+		PrintWidth:   80,
+	})
+	expected := ".foo {\n  @media (width <= 767px) { margin-left: 0; }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+func TestFormatPreserve_AtRuleMultiLine(t *testing.T) {
+	// Preserve mode: at-rule originally multi-line → stays multi-line
+	src := []byte(`.foo {
+  @media (width <= 767px) {
+    margin-left: 0;
+  }
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+		Mode:         FormatPreserve,
+		PrintWidth:   80,
+	})
+	expected := ".foo {\n  @media (width <= 767px) {\n    margin-left: 0;\n  }\n}\n"
+	if result != expected {
+		t.Errorf("got:\n%q\nwant:\n%q", result, expected)
+	}
+}
+
 // --- Blank line handling tests ---
 
 func TestFormatCompact_NoBlankLinesBetweenTopLevelRules(t *testing.T) {

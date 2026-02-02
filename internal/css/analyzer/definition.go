@@ -10,6 +10,16 @@ type Location struct {
 	EndPos   int
 }
 
+// DefinitionResult holds both the origin range (at the usage
+// site, e.g. var(--name)) and the target range (at the
+// declaration, e.g. --name).
+type DefinitionResult struct {
+	OriginStart int
+	OriginEnd   int
+	TargetStart int
+	TargetEnd   int
+}
+
 // FindDefinition finds the definition of the symbol at the
 // given offset. Currently supports CSS custom properties
 // (var(--name) -> --name declaration).
@@ -17,16 +27,27 @@ func FindDefinition(
 	ss *parser.Stylesheet,
 	src []byte,
 	offset int,
-) (Location, bool) {
-	// Find what's at the cursor
-	varName := FindVarReferenceAt(ss, src, offset)
+) (DefinitionResult, bool) {
+	// Find what's at the cursor and the var() span
+	varName, originStart, originEnd := FindVarReferenceWithRange(
+		ss, src, offset,
+	)
 	if varName == "" {
-		return Location{}, false
+		return DefinitionResult{}, false
 	}
 
 	// Search for the custom property declaration
 	loc, found := findCustomPropertyDecl(ss, varName)
-	return loc, found
+	if !found {
+		return DefinitionResult{}, false
+	}
+
+	return DefinitionResult{
+		OriginStart: originStart,
+		OriginEnd:   originEnd,
+		TargetStart: loc.StartPos,
+		TargetEnd:   loc.EndPos,
+	}, true
 }
 
 // findCustomPropertyDecl finds the declaration of a custom

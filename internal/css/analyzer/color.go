@@ -91,7 +91,11 @@ func findColorsInTokens(
 			}
 
 		case scanner.Ident:
-			if c, ok := namedColorMap[strings.ToLower(tok.Value)]; ok {
+			name := strings.ToLower(tok.Value)
+			if name == "currentcolor" {
+				continue
+			}
+			if c, ok := namedColorMap[name]; ok {
 				colors = append(colors, DocumentColor{
 					Color:    c,
 					StartPos: tok.Offset,

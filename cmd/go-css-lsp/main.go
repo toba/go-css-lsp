@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 
 	"github.com/toba/go-css-lsp/cmd/go-css-lsp/lsp"
@@ -365,6 +366,7 @@ func processHover(
 		ss, src,
 		int(req.Params.Position.Line),      //nolint:gosec // LSP positions are small
 		int(req.Params.Position.Character), //nolint:gosec // LSP positions are small
+		storage.VarIndex,
 	)
 
 	res := lsp.ResponseMessage[*lsp.HoverResult]{
@@ -1038,6 +1040,69 @@ func processDocumentLink(
 	return out
 }
 
+// containsOnly checks if a code action kind is in the only
+// filter list.
+func containsOnly(only []string, kind string) bool {
+	return slices.Contains(only, kind)
+}
+
+// processFixAll computes all fixable edits and returns them as
+// a single source.fixAll code action.
+func processFixAll(
+	req lsp.RequestMessage[lsp.CodeActionParams],
+	src []byte,
+	uri string,
+	storage *workspaceStore,
+) []byte {
+	actions := css.FixAllActions(src, storage.LintOpts)
+	if len(actions) == 0 {
+		return marshalEmptyArray(req.JsonRpc, req.Id)
+	}
+
+	edits := make([]lsp.TextEdit, len(actions))
+	for i, a := range actions {
+		edits[i] = lsp.TextEdit{
+			Range: lsp.Range{
+				Start: lsp.Position{
+					Line:      uint(a.StartLine), //nolint:gosec
+					Character: uint(a.StartChar), //nolint:gosec
+				},
+				End: lsp.Position{
+					Line:      uint(a.EndLine), //nolint:gosec
+					Character: uint(a.EndChar), //nolint:gosec
+				},
+			},
+			NewText: a.ReplaceWith,
+		}
+	}
+
+	result := []lsp.LSPCodeAction{{
+		Title: "Fix all auto-fixable problems",
+		Kind:  analyzer.CodeActionSourceFixAll,
+		Edit: &lsp.WorkspaceEdit{
+			Changes: map[string][]lsp.TextEdit{
+				uri: edits,
+			},
+		},
+	}}
+
+	res := lsp.ResponseMessage[[]lsp.LSPCodeAction]{
+		JsonRpc: req.JsonRpc,
+		Id:      req.Id,
+		Result:  result,
+	}
+
+	out, err := json.Marshal(res)
+	if err != nil {
+		slog.Warn(
+			"Error marshalling fixAll response: " +
+				err.Error(),
+		)
+		return nil
+	}
+	return out
+}
+
 // processCodeAction handles textDocument/codeAction.
 func processCodeAction(
 	data []byte,
@@ -1058,6 +1123,14 @@ func processCodeAction(
 	src := getFileContent(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
+	}
+
+	// Handle source.fixAll requests
+	if containsOnly(
+		req.Params.Context.Only,
+		analyzer.CodeActionSourceFixAll,
+	) {
+		return processFixAll(req, src, uri, storage)
 	}
 
 	// Convert LSP diagnostics to analyzer diagnostics
@@ -1222,26 +1295,32 @@ func processDefinition(
 		ss = result.Stylesheet
 	}
 
-	loc, found := css.Definition(
+	defResult, found := css.Definition(
 		ss, src,
 		int(req.Params.Position.Line),      //nolint:gosec
 		int(req.Params.Position.Character), //nolint:gosec
 	)
 
 	if found {
-		result := lsp.LSPLocation{
-			URI: uri,
-			Range: offsetRangeToLSPRange(
-				src, loc.StartPos, loc.EndPos,
-			),
-		}
+		originRange := offsetRangeToLSPRange(
+			src, defResult.OriginStart, defResult.OriginEnd,
+		)
+		targetRange := offsetRangeToLSPRange(
+			src, defResult.TargetStart, defResult.TargetEnd,
+		)
+		result := []lsp.LSPLocationLink{{
+			OriginSelectionRange: &originRange,
+			TargetUri:            uri,
+			TargetRange:          targetRange,
+			TargetSelectionRange: targetRange,
+		}}
 		return marshalDefinitionResult(
 			req.JsonRpc, req.Id, result,
 		)
 	}
 
 	// Fall back to workspace index for cross-file lookup
-	varName := css.VarReferenceAt(
+	varName, originStart, originEnd := css.VarReferenceWithRange(
 		ss, src,
 		int(req.Params.Position.Line),      //nolint:gosec
 		int(req.Params.Position.Character), //nolint:gosec
@@ -1261,21 +1340,29 @@ func processDefinition(
 		return marshalNullResult(req.JsonRpc, req.Id)
 	}
 
-	result := lsp.LSPLocation{
-		URI: def.URI,
-		Range: offsetRangeToLSPRange(
-			targetSrc, def.StartPos, def.EndPos,
-		),
-	}
-	return marshalDefinitionResult(req.JsonRpc, req.Id, result)
+	originRange := offsetRangeToLSPRange(
+		src, originStart, originEnd,
+	)
+	targetRange := offsetRangeToLSPRange(
+		targetSrc, def.StartPos, def.EndPos,
+	)
+	result := []lsp.LSPLocationLink{{
+		OriginSelectionRange: &originRange,
+		TargetUri:            def.URI,
+		TargetRange:          targetRange,
+		TargetSelectionRange: targetRange,
+	}}
+	return marshalDefinitionResult(
+		req.JsonRpc, req.Id, result,
+	)
 }
 
 func marshalDefinitionResult(
 	jsonRpc string,
 	id lsp.ID,
-	result lsp.LSPLocation,
+	result []lsp.LSPLocationLink,
 ) []byte {
-	res := lsp.ResponseMessage[lsp.LSPLocation]{
+	res := lsp.ResponseMessage[[]lsp.LSPLocationLink]{
 		JsonRpc: jsonRpc,
 		Id:      id,
 		Result:  result,

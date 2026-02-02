@@ -64,6 +64,16 @@ func TestFindDocumentColors_Transparent(t *testing.T) {
 	assertColorClose(t, colors[0].Color, 0.0, 0.0, 0.0, 0.0)
 }
 
+func TestFindDocumentColors_CurrentColor(t *testing.T) {
+	src := []byte(`.foo { color: currentcolor; }`)
+	ss, _ := parser.Parse(src)
+	colors := FindDocumentColors(ss, src)
+
+	if len(colors) != 0 {
+		t.Fatalf("expected 0 colors for currentcolor, got %d", len(colors))
+	}
+}
+
 func TestFindDocumentColors_RGBFunction(t *testing.T) {
 	src := []byte(`.foo { color: rgb(255, 128, 0); }`)
 	ss, _ := parser.Parse(src)
