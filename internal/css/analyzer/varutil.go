@@ -193,13 +193,14 @@ func FindVarReferenceWithRange(
 
 		tokens := decl.Value.Tokens
 		for _, ref := range findVarRefs(tokens) {
-			if offset >= ref.varStart &&
-				offset <= ref.varEnd {
-				name = tokens[ref.identIdx].Value
-				start = ref.varStart
-				end = ref.varEnd
-				return false
+			if offset < ref.varStart || offset > ref.varEnd {
+				continue
 			}
+			ident := tokens[ref.identIdx]
+			name = ident.Value
+			start = ident.Offset
+			end = ident.End
+			return false
 		}
 
 		// Check if cursor is directly on a --variable ident
@@ -211,8 +212,8 @@ func FindVarReferenceWithRange(
 				for _, ref := range findVarRefs(tokens) {
 					if tokens[ref.identIdx].Offset == tok.Offset {
 						name = tok.Value
-						start = ref.varStart
-						end = ref.varEnd
+						start = tok.Offset
+						end = tok.End
 						return false
 					}
 				}

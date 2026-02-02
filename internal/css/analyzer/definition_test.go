@@ -29,9 +29,9 @@ func TestFindDefinition_VarReference(t *testing.T) {
 	}
 
 	originText := string(src[result.OriginStart:result.OriginEnd])
-	if originText != "var(--primary)" {
+	if originText != "--primary" {
 		t.Errorf(
-			"expected var(--primary), got %q", originText,
+			"expected --primary, got %q", originText,
 		)
 	}
 }
@@ -55,9 +55,9 @@ func TestFindDefinition_CursorOnVarName(t *testing.T) {
 	}
 
 	originText := string(src[result.OriginStart:result.OriginEnd])
-	if originText != "var(--color)" {
+	if originText != "--color" {
 		t.Errorf(
-			"expected var(--color), got %q", originText,
+			"expected --color, got %q", originText,
 		)
 	}
 }

@@ -1373,7 +1373,16 @@ func processDefinition(
 	def := defs[0]
 	targetSrc := storage.getRawFile(def.URI)
 	if targetSrc == nil {
-		return marshalNullResult(req.JsonRpc, req.Id)
+		// File not open in editor — read from disk.
+		path := uriToFilePath(def.URI)
+		if path == "" {
+			return marshalNullResult(req.JsonRpc, req.Id)
+		}
+		data, err := os.ReadFile(path) //nolint:gosec // path from LSP URI
+		if err != nil {
+			return marshalNullResult(req.JsonRpc, req.Id)
+		}
+		targetSrc = data
 	}
 
 	originRange := offsetRangeToLSPRange(
