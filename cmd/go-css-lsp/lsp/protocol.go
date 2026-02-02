@@ -7,6 +7,7 @@ const (
 	TextDocumentSyncFull = 1
 
 	ErrorInvalidRequest = -32600
+	ErrorInternalError  = -32603
 )
 
 // LSP method names.

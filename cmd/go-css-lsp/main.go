@@ -126,7 +126,7 @@ func main() {
 			if request.Method == lsp.MethodExit {
 				break
 			}
-			response = lsp.ProcessIllegalRequestAfterShutdown(
+			response, _ = lsp.ProcessIllegalRequestAfterShutdown(
 				request.JsonRpc, request.Id,
 			)
 			lsp.SendToLspClient(os.Stdout, response)
@@ -135,202 +135,217 @@ func main() {
 
 		slog.Info("request " + request.Method)
 
-		switch request.Method {
-		case lsp.MethodInitialize:
-			var rootURI string
-			var settings *lsp.ServerSettings
-			response, rootURI, settings = lsp.ProcessInitializeRequest(
-				data, serverName, version,
-			)
-			storage.Settings = settings
-			if settings != nil {
-				storage.LintOpts.Experimental = modeFromString(
-					settings.ExperimentalFeatures,
-					analyzer.ExperimentalIgnore,
-					analyzer.ExperimentalError,
-					analyzer.ExperimentalWarn,
-				)
-				storage.LintOpts.Deprecated = modeFromString(
-					settings.DeprecatedFeatures,
-					analyzer.DeprecatedIgnore,
-					analyzer.DeprecatedError,
-					analyzer.DeprecatedWarn,
-				)
-				storage.LintOpts.UnknownValues = modeFromString(
-					settings.UnknownValues,
-					analyzer.UnknownValueIgnore,
-					analyzer.UnknownValueError,
-					analyzer.UnknownValueWarn,
-				)
-				storage.LintOpts.StrictColorNames = settings.StrictColorNames
-			}
-			notifyTheRootPath(
-				rootPathNotification, rootURI,
-			)
+		response, isRequestResponse = handleRequest(
+			request.Method, data, &request,
+			storage, rootPathNotification,
+			textChangedNotification,
+			textFromClient, muTextFromClient,
+		)
+
+		if request.Method == lsp.MethodInitialize {
 			rootPathNotification = nil
-			isRequestResponse = true
-
-		case lsp.MethodInitialized:
-			isRequestResponse = false
-			lsp.ProcessInitializedNotification(data)
-
-		case lsp.MethodShutdown:
+		}
+		if request.Method == lsp.MethodShutdown {
 			isExiting = true
-			isRequestResponse = true
-			response = lsp.ProcessShutdownRequest(
-				request.JsonRpc, request.Id,
-			)
-
-		case lsp.MethodDidOpen:
-			isRequestResponse = false
-			fileURI, fileContent :=
-				lsp.ProcessDidOpenTextDocumentNotification(
-					data,
-				)
-			insertTextDocumentToDiagnostic(
-				fileURI,
-				fileContent,
-				textChangedNotification,
-				textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodDidChange:
-			isRequestResponse = false
-			fileURI, fileContent :=
-				lsp.ProcessDidChangeTextDocumentNotification(
-					data,
-				)
-			insertTextDocumentToDiagnostic(
-				fileURI,
-				fileContent,
-				textChangedNotification,
-				textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodDidClose:
-			isRequestResponse = false
-			lsp.ProcessDidCloseTextDocumentNotification(data)
-
-		case lsp.MethodHover:
-			isRequestResponse = true
-			response = processHover(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodCompletion:
-			isRequestResponse = true
-			response = processCompletion(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodDocumentColor:
-			isRequestResponse = true
-			response = processDocumentColor(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodColorPresentation:
-			isRequestResponse = true
-			response = processColorPresentation(data)
-
-		case lsp.MethodSelectionRange:
-			isRequestResponse = true
-			response = processSelectionRange(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodPrepareRename:
-			isRequestResponse = true
-			response = processPrepareRename(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodRename:
-			isRequestResponse = true
-			response = processRename(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodFormatting:
-			isRequestResponse = true
-			response = processFormatting(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodDocumentHighlight:
-			isRequestResponse = true
-			response = processDocumentHighlight(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodFoldingRange:
-			isRequestResponse = true
-			response = processFoldingRange(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodDocumentLink:
-			isRequestResponse = true
-			response = processDocumentLink(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodCodeAction:
-			isRequestResponse = true
-			response = processCodeAction(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodReferences:
-			isRequestResponse = true
-			response = processReferences(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodDefinition:
-			isRequestResponse = true
-			response = processDefinition(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		case lsp.MethodDocumentSymbol:
-			isRequestResponse = true
-			response = processDocumentSymbol(
-				data, storage, textFromClient,
-				muTextFromClient,
-			)
-
-		default:
-			isRequestResponse = false
 		}
 
 		if isRequestResponse {
 			lsp.SendToLspClient(os.Stdout, response)
 		}
-
-		response = nil
 	}
 
 	if scanner.Err() != nil {
-		msg := "error while closing LSP: " +
-			scanner.Err().Error()
-		slog.Error(msg)
-		panic(msg)
+		slog.Error(
+			"error while closing LSP: " +
+				scanner.Err().Error(),
+		)
+	}
+}
+
+// handleRequest dispatches a single LSP request with panic
+// recovery. If any handler panics, the server logs the error
+// and returns an internal error response instead of crashing.
+func handleRequest(
+	method string,
+	data []byte,
+	request *lsp.RequestMessage[any],
+	storage *workspaceStore,
+	rootPathNotification chan string,
+	textChangedNotification chan bool,
+	textFromClient map[string][]byte,
+	mu *sync.Mutex,
+) (response []byte, isRequestResponse bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
+			slog.Error("panic in request handler",
+				slog.String("method", method),
+				slog.Any("panic", r),
+				slog.String("stack", string(buf[:n])),
+			)
+			// Return an internal error response so the
+			// client gets a reply instead of a dead server.
+			response = lsp.MakeInternalError(
+				request.JsonRpc, request.Id,
+				fmt.Sprintf("internal error: %v", r),
+			)
+			isRequestResponse = true
+		}
+	}()
+
+	switch method {
+	case lsp.MethodInitialize:
+		var rootURI string
+		var settings *lsp.ServerSettings
+		var err error
+		response, rootURI, settings, err =
+			lsp.ProcessInitializeRequest(
+				data, serverName, version,
+			)
+		if err != nil {
+			return nil, false
+		}
+		storage.Settings = settings
+		if settings != nil {
+			storage.LintOpts.Experimental = modeFromString(
+				settings.ExperimentalFeatures,
+				analyzer.ExperimentalIgnore,
+				analyzer.ExperimentalError,
+				analyzer.ExperimentalWarn,
+			)
+			storage.LintOpts.Deprecated = modeFromString(
+				settings.DeprecatedFeatures,
+				analyzer.DeprecatedIgnore,
+				analyzer.DeprecatedError,
+				analyzer.DeprecatedWarn,
+			)
+			storage.LintOpts.UnknownValues = modeFromString(
+				settings.UnknownValues,
+				analyzer.UnknownValueIgnore,
+				analyzer.UnknownValueError,
+				analyzer.UnknownValueWarn,
+			)
+			storage.LintOpts.StrictColorNames = settings.StrictColorNames
+		}
+		notifyTheRootPath(rootPathNotification, rootURI)
+		return response, true
+
+	case lsp.MethodInitialized:
+		lsp.ProcessInitializedNotification(data)
+		return nil, false
+
+	case lsp.MethodShutdown:
+		response, _ = lsp.ProcessShutdownRequest(
+			request.JsonRpc, request.Id,
+		)
+		return response, true
+
+	case lsp.MethodDidOpen:
+		fileURI, fileContent, err :=
+			lsp.ProcessDidOpenTextDocumentNotification(data)
+		if err != nil {
+			return nil, false
+		}
+		insertTextDocumentToDiagnostic(
+			fileURI, fileContent,
+			textChangedNotification,
+			textFromClient, mu,
+		)
+		return nil, false
+
+	case lsp.MethodDidChange:
+		fileURI, fileContent, err :=
+			lsp.ProcessDidChangeTextDocumentNotification(data)
+		if err != nil {
+			return nil, false
+		}
+		insertTextDocumentToDiagnostic(
+			fileURI, fileContent,
+			textChangedNotification,
+			textFromClient, mu,
+		)
+		return nil, false
+
+	case lsp.MethodDidClose:
+		lsp.ProcessDidCloseTextDocumentNotification(data)
+		return nil, false
+
+	case lsp.MethodHover:
+		return processHover(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodCompletion:
+		return processCompletion(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodDocumentColor:
+		return processDocumentColor(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodColorPresentation:
+		return processColorPresentation(data), true
+
+	case lsp.MethodSelectionRange:
+		return processSelectionRange(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodPrepareRename:
+		return processPrepareRename(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodRename:
+		return processRename(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodFormatting:
+		return processFormatting(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodDocumentHighlight:
+		return processDocumentHighlight(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodFoldingRange:
+		return processFoldingRange(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodDocumentLink:
+		return processDocumentLink(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodCodeAction:
+		return processCodeAction(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodReferences:
+		return processReferences(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodDefinition:
+		return processDefinition(
+			data, storage, textFromClient, mu,
+		), true
+
+	case lsp.MethodDocumentSymbol:
+		return processDocumentSymbol(
+			data, storage, textFromClient, mu,
+		), true
+
+	default:
+		return nil, false
 	}
 }
 

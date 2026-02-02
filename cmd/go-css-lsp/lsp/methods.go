@@ -16,6 +16,9 @@ type ID int
 
 func (id *ID) UnmarshalJSON(data []byte) error {
 	length := len(data)
+	if length == 0 {
+		return errors.New("'ID' cannot be empty")
+	}
 	if data[0] == '"' && data[length-1] == '"' {
 		data = data[1 : length-1]
 	}
@@ -200,18 +203,17 @@ type CompletionList struct {
 func ProcessInitializeRequest(
 	data []byte,
 	lspName, lspVersion string,
-) (response []byte, root string, settings *ServerSettings) {
+) (response []byte, root string, settings *ServerSettings, err error) {
 	req := RequestMessage[InitializeParams]{}
 
-	err := json.Unmarshal(data, &req)
-	if err != nil {
-		msg := "error unmarshalling 'initialize': " + err.Error()
-		slog.Error(msg,
+	if err = json.Unmarshal(data, &req); err != nil {
+		slog.Error(
+			"error unmarshalling 'initialize': "+err.Error(),
 			slog.Group("details",
 				slog.String("received_req", string(data)),
 			),
 		)
-		panic(msg)
+		return nil, "", nil, err
 	}
 
 	res := ResponseMessage[InitializeResult]{
@@ -253,12 +255,14 @@ func ProcessInitializeRequest(
 
 	response, err = json.Marshal(res)
 	if err != nil {
-		msg := "error marshalling 'initialize': " + err.Error()
-		slog.Error(msg)
-		panic(msg)
+		slog.Error(
+			"error marshalling 'initialize': " + err.Error(),
+		)
+		return nil, "", nil, err
 	}
 
-	return response, req.Params.RootUri, req.Params.InitializationOptions
+	return response, req.Params.RootUri,
+		req.Params.InitializationOptions, nil
 }
 
 // ProcessInitializedNotification handles the initialized
@@ -274,7 +278,7 @@ func ProcessInitializedNotification(data []byte) {
 func ProcessShutdownRequest(
 	jsonVersion string,
 	requestId ID,
-) []byte {
+) ([]byte, error) {
 	response := ResponseMessage[any]{
 		JsonRpc: jsonVersion,
 		Id:      requestId,
@@ -284,12 +288,14 @@ func ProcessShutdownRequest(
 
 	responseText, err := json.Marshal(response)
 	if err != nil {
-		msg := "Error marshalling shutdown response: " + err.Error()
-		slog.Error(msg)
-		panic(msg)
+		slog.Error(
+			"Error marshalling shutdown response: " +
+				err.Error(),
+		)
+		return nil, err
 	}
 
-	return responseText
+	return responseText, nil
 }
 
 // ProcessIllegalRequestAfterShutdown returns an error for
@@ -297,7 +303,7 @@ func ProcessShutdownRequest(
 func ProcessIllegalRequestAfterShutdown(
 	jsonVersion string,
 	requestId ID,
-) []byte {
+) ([]byte, error) {
 	response := ResponseMessage[any]{
 		JsonRpc: jsonVersion,
 		Id:      requestId,
@@ -310,12 +316,14 @@ func ProcessIllegalRequestAfterShutdown(
 
 	responseText, err := json.Marshal(response)
 	if err != nil {
-		msg := "Error marshalling error response: " + err.Error()
-		slog.Error(msg)
-		panic(msg)
+		slog.Error(
+			"Error marshalling error response: " +
+				err.Error(),
+		)
+		return nil, err
 	}
 
-	return responseText
+	return responseText, nil
 }
 
 // DidOpenTextDocumentParams for textDocument/didOpen.
@@ -326,25 +334,25 @@ type DidOpenTextDocumentParams struct {
 // ProcessDidOpenTextDocumentNotification handles didOpen.
 func ProcessDidOpenTextDocumentNotification(
 	data []byte,
-) (fileURI string, fileContent []byte) {
+) (fileURI string, fileContent []byte, err error) {
 	request := RequestMessage[DidOpenTextDocumentParams]{}
 
-	err := json.Unmarshal(data, &request)
-	if err != nil {
-		msg := "error unmarshalling 'textDocument/didOpen': " + err.Error()
-		slog.Error(msg,
+	if err = json.Unmarshal(data, &request); err != nil {
+		slog.Error(
+			"error unmarshalling 'textDocument/didOpen': "+
+				err.Error(),
 			slog.Group("details",
 				slog.String("received_req", string(data)),
 			),
 		)
-		panic(msg)
+		return "", nil, err
 	}
 
 	documentURI := request.Params.TextDocument.Uri
 	documentContent := request.Params.TextDocument.Text
 	filesOpenedByEditor[documentURI] = documentContent
 
-	return documentURI, []byte(documentContent)
+	return documentURI, []byte(documentContent), nil
 }
 
 // TextDocumentContentChangeEvent represents a content change.
@@ -363,41 +371,43 @@ type DidChangeTextDocumentParams struct {
 // ProcessDidChangeTextDocumentNotification handles didChange.
 func ProcessDidChangeTextDocumentNotification(
 	data []byte,
-) (fileURI string, fileContent []byte) {
+) (fileURI string, fileContent []byte, err error) {
 	var request RequestMessage[DidChangeTextDocumentParams]
 
-	err := json.Unmarshal(data, &request)
-	if err != nil {
-		msg := "error unmarshalling 'textDocument/didChange': " + err.Error()
-		slog.Error(msg,
+	if err = json.Unmarshal(data, &request); err != nil {
+		slog.Error(
+			"error unmarshalling 'textDocument/didChange': "+
+				err.Error(),
 			slog.Group("details",
 				slog.String("received_req", string(data)),
 			),
 		)
-		panic(msg)
+		return "", nil, err
 	}
 
 	documentChanges := request.Params.ContentChanges
 	if len(documentChanges) > 1 {
-		msg := "server doesn't handle incremental changes yet"
-		slog.Error(msg,
+		slog.Error(
+			"server doesn't handle incremental changes yet",
 			slog.Group("details",
 				slog.String("received_req", string(data)),
 			),
 		)
-		panic(msg)
+		return "", nil, errors.New(
+			"server doesn't handle incremental changes yet",
+		)
 	}
 
 	if len(documentChanges) == 0 {
 		slog.Warn("'documentChanges' field is empty")
-		return "", nil
+		return "", nil, nil
 	}
 
 	documentContent := documentChanges[0].Text
 	documentURI := request.Params.TextDocument.Uri
 	filesOpenedByEditor[documentURI] = documentContent
 
-	return documentURI, []byte(documentContent)
+	return documentURI, []byte(documentContent), nil
 }
 
 // DidCloseTextDocumentParams for textDocument/didClose.
@@ -408,25 +418,21 @@ type DidCloseTextDocumentParams struct {
 // ProcessDidCloseTextDocumentNotification handles didClose.
 func ProcessDidCloseTextDocumentNotification(
 	data []byte,
-) (fileURI string, fileContent []byte) {
+) {
 	var request RequestMessage[DidCloseTextDocumentParams]
 
-	err := json.Unmarshal(data, &request)
-	if err != nil {
-		msg := "error unmarshalling 'textDocument/didClose': " + err.Error()
-		slog.Error(msg,
+	if err := json.Unmarshal(data, &request); err != nil {
+		slog.Error(
+			"error unmarshalling 'textDocument/didClose': "+
+				err.Error(),
 			slog.Group("details",
 				slog.String("received_req", string(data)),
 			),
 		)
-		panic(msg)
+		return
 	}
 
-	documentPath := request.Params.TextDocument.Uri
-	documentContent := request.Params.TextDocument.Text
-	delete(filesOpenedByEditor, documentPath)
-
-	return documentPath, []byte(documentContent)
+	delete(filesOpenedByEditor, request.Params.TextDocument.Uri)
 }
 
 // HoverParams for textDocument/hover.
@@ -628,4 +634,21 @@ type RenameParams struct {
 	TextDocument TextDocumentIdentifier `json:"textDocument"`
 	Position     Position               `json:"position"`
 	NewName      string                 `json:"newName"`
+}
+
+// MakeInternalError returns a JSON-RPC error response for
+// internal server errors (e.g. recovered panics).
+func MakeInternalError(
+	jsonRpc string, id ID, message string,
+) []byte {
+	res := ResponseMessage[any]{
+		JsonRpc: jsonRpc,
+		Id:      id,
+		Error: &ResponseError{
+			Code:    ErrorInternalError,
+			Message: message,
+		},
+	}
+	out, _ := json.Marshal(res)
+	return out
 }
