@@ -173,6 +173,33 @@ func TestCompleteValueContext(t *testing.T) {
 	}
 }
 
+func TestCompleteValueContext_WhiteSpace(t *testing.T) {
+	src := []byte("body { white-space: ; }")
+	ss, _ := parser.Parse(src)
+
+	// offset 20 is right before the ; (after "white-space: ")
+	items := Complete(ss, src, 19, LintOptions{})
+
+	expected := map[string]bool{
+		"normal":       false,
+		"nowrap":       false,
+		"pre":          false,
+		"pre-wrap":     false,
+		"pre-line":     false,
+		"break-spaces": false,
+	}
+	for _, item := range items {
+		if _, ok := expected[item.Label]; ok {
+			expected[item.Label] = true
+		}
+	}
+	for name, found := range expected {
+		if !found {
+			t.Errorf("expected %q in value completions for white-space", name)
+		}
+	}
+}
+
 func TestCompleteDeprecatedPropertyTagged(t *testing.T) {
 	src := []byte("body { cli }")
 	ss, _ := parser.Parse(src)

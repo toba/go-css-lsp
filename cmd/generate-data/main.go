@@ -149,6 +149,7 @@ func main() {
 var extraValues = map[string][]string{
 	"outline":        {"none"},
 	"pointer-events": {"auto"},
+	"white-space":    {"normal", "nowrap", "pre", "pre-wrap", "pre-line", "break-spaces"},
 }
 
 // Properties that accept arbitrary identifiers — clear their

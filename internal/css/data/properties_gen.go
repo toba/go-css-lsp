@@ -3832,6 +3832,14 @@ var Properties = []Property{
 		Name:        "white-space",
 		Description: "Specifies how whitespace is handled in an element.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/white-space",
+		Values: []string{
+			"normal",
+			"nowrap",
+			"pre",
+			"pre-wrap",
+			"pre-line",
+			"break-spaces",
+		},
 	},
 	{
 		Name:        "white-space-collapse",

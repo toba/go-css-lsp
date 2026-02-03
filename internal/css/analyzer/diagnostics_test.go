@@ -487,6 +487,32 @@ func TestAnalyzeUnknownValue_PointerEventsAuto(t *testing.T) {
 	}
 }
 
+func TestAnalyzeUnknownValue_WhiteSpaceInvalid(t *testing.T) {
+	src := []byte(`body { white-space: banana; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	if _, ok := findDiagnostic(
+		diags,
+		UnknownValueMessage("banana", "white-space"),
+	); !ok {
+		t.Error("expected diagnostic for unknown value 'banana'")
+	}
+}
+
+func TestAnalyzeUnknownValue_WhiteSpaceNowrap(t *testing.T) {
+	src := []byte(`body { white-space: nowrap; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	if _, ok := findDiagnostic(
+		diags,
+		UnknownValueMessage("nowrap", "white-space"),
+	); ok {
+		t.Error("'nowrap' is a valid value for white-space")
+	}
+}
+
 func TestAnalyzeUnknownValue_GridAreaIdent(t *testing.T) {
 	src := []byte(`body { grid-area: header; }`)
 	ss := parseCSS(t, src)
