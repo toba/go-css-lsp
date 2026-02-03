@@ -553,8 +553,8 @@ func TestFindDocumentColorsVarNonColor(t *testing.T) {
 }
 
 func TestFindDocumentColorsVarNested(t *testing.T) {
-	// var() inside a variable value should not be recursively
-	// resolved (nil resolver on recursion).
+	// var() inside a variable value should be recursively
+	// resolved through a depth-limited resolver.
 	src := []byte(`.foo { color: var(--alias); }`)
 	ss, _ := parser.Parse(src)
 	resolver := &mockResolver{
@@ -565,11 +565,78 @@ func TestFindDocumentColorsVarNested(t *testing.T) {
 	}
 	colors := FindDocumentColorsResolved(ss, src, resolver)
 
-	// --alias resolves to "var(--real)" which contains a var()
-	// but since recursion uses nil resolver, no color found.
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.0, 1.0, 0.0, 1.0)
+}
+
+func TestFindDocumentColorsVarTripleChain(t *testing.T) {
+	src := []byte(`.foo { color: var(--a); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--a": "var(--b)",
+			"--b": "var(--c)",
+			"--c": "#0000ff",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.0, 0.0, 1.0, 1.0)
+}
+
+func TestFindDocumentColorsVarCircular(t *testing.T) {
+	src := []byte(`.foo { color: var(--a); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--a": "var(--b)",
+			"--b": "var(--a)",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
 	if len(colors) != 0 {
 		t.Fatalf("expected 0 colors, got %d", len(colors))
 	}
+}
+
+func TestFindDocumentColorsVarChainNamed(t *testing.T) {
+	src := []byte(`.foo { color: var(--x); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--x": "var(--y)",
+			"--y": "red",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 1.0, 0.0, 0.0, 1.0)
+}
+
+func TestFindDocumentColorsVarChainRGB(t *testing.T) {
+	src := []byte(`.foo { color: var(--x); }`)
+	ss, _ := parser.Parse(src)
+	resolver := &mockResolver{
+		vars: map[string]string{
+			"--x": "var(--y)",
+			"--y": "rgb(0, 128, 255)",
+		},
+	}
+	colors := FindDocumentColorsResolved(ss, src, resolver)
+
+	if len(colors) != 1 {
+		t.Fatalf("expected 1 color, got %d", len(colors))
+	}
+	assertColorClose(t, colors[0].Color, 0.0, 128.0/255.0, 1.0, 1.0)
 }
 
 func TestFindDocumentColorsVarRGBValue(t *testing.T) {

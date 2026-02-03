@@ -32,6 +32,26 @@ type VariableResolver interface {
 	ResolveVariable(name string) (rawValue string, ok bool)
 }
 
+const maxVarDepth = 5
+
+// depthLimitedResolver wraps a VariableResolver with a depth
+// counter to prevent infinite recursion through chained var()
+// references.
+type depthLimitedResolver struct {
+	inner VariableResolver
+	depth int
+}
+
+func (d *depthLimitedResolver) ResolveVariable(
+	name string,
+) (string, bool) {
+	if d.depth <= 0 {
+		return "", false
+	}
+	d.depth--
+	return d.inner.ResolveVariable(name)
+}
+
 // FindDocumentColors returns all colors found in the CSS
 // document.
 func FindDocumentColors(
@@ -211,9 +231,23 @@ resolve:
 	}
 
 	// Scan the raw value as CSS tokens and look for a color.
-	// Pass nil resolver to prevent infinite recursion.
+	// Use a depth-limited resolver to allow chained var()
+	// resolution while preventing infinite recursion.
 	valTokens := scanner.ScanAll([]byte(rawValue))
-	resolved := findColorsInTokens(valTokens, []byte(rawValue), nil)
+	var remaining int
+	if dl, ok := resolver.(*depthLimitedResolver); ok {
+		remaining = dl.depth
+	} else {
+		remaining = maxVarDepth
+	}
+	nextResolver := &depthLimitedResolver{
+		inner: resolver,
+		depth: remaining,
+	}
+	if dl, ok := resolver.(*depthLimitedResolver); ok {
+		nextResolver.inner = dl.inner
+	}
+	resolved := findColorsInTokens(valTokens, []byte(rawValue), nextResolver)
 	if len(resolved) == 0 {
 		return DocumentColor{}, false
 	}
