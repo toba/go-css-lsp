@@ -947,16 +947,23 @@ func colorToLab(c Color) [4]float64 {
 	return [4]float64{l, a, b, c.Alpha}
 }
 
-// colorToLCH decomposes sRGB Color to [L,C,H,alpha] in
-// CIE LCH native ranges.
-func colorToLCH(c Color) [4]float64 {
-	l, a, b := srgbToLab(c.Red, c.Green, c.Blue)
-	ch := math.Sqrt(a*a + b*b)
+// labToLCH converts L,a,b coordinates to L,C,H where C is
+// chroma and H is hue in degrees [0,360).
+func labToLCH(l, a, b float64) (float64, float64, float64) {
+	c := math.Sqrt(a*a + b*b)
 	h := math.Atan2(b, a) * 180 / math.Pi
 	if h < 0 {
 		h += 360
 	}
-	return [4]float64{l, ch, h, c.Alpha}
+	return l, c, h
+}
+
+// colorToLCH decomposes sRGB Color to [L,C,H,alpha] in
+// CIE LCH native ranges.
+func colorToLCH(c Color) [4]float64 {
+	l, a, b := srgbToLab(c.Red, c.Green, c.Blue)
+	lch, ch, h := labToLCH(l, a, b)
+	return [4]float64{lch, ch, h, c.Alpha}
 }
 
 // colorToOklab decomposes sRGB Color to [L,a,b,alpha] in
@@ -970,12 +977,8 @@ func colorToOklab(c Color) [4]float64 {
 // Oklch native ranges.
 func colorToOklch(c Color) [4]float64 {
 	l, a, b := srgbToOklab(c.Red, c.Green, c.Blue)
-	ch := math.Sqrt(a*a + b*b)
-	h := math.Atan2(b, a) * 180 / math.Pi
-	if h < 0 {
-		h += 360
-	}
-	return [4]float64{l, ch, h, c.Alpha}
+	lch, ch, h := labToLCH(l, a, b)
+	return [4]float64{lch, ch, h, c.Alpha}
 }
 
 // colorSpaceChannels maps color function names to their channel
@@ -1055,57 +1058,37 @@ func parseOriginColor(
 			switch name {
 			case "rgb", "rgba", "hsl", "hsla", "hwb",
 				"lab", "lch", "oklab", "oklch":
-				// Find matching close paren for this
-				// nested function.
-				depth := 1
-				for j := i + 1; j < len(tokens); j++ {
-					switch tokens[j].Kind {
-					case scanner.Function, scanner.ParenOpen:
-						depth++
-					case scanner.ParenClose:
-						depth--
-						if depth == 0 {
-							// Parse the sub-function
-							dc, ok := parseColorFunction(
-								name,
-								tokens[i:j+1],
-								src,
-								resolver,
-							)
-							if !ok {
-								return Color{}, j + 1, false
-							}
-							return dc.Color, j + 1, true
-						}
-					}
+				j := skipPastCloseParen(tokens, i)
+				if j == i {
+					return Color{}, i, false
 				}
-				return Color{}, i, false
+				dc, ok := parseColorFunction(
+					name,
+					tokens[i:j+1],
+					src,
+					resolver,
+				)
+				if !ok {
+					return Color{}, j + 1, false
+				}
+				return dc.Color, j + 1, true
 
 			case "var":
 				if resolver == nil {
 					return Color{}, i, false
 				}
-				// Find matching close paren.
-				depth := 1
-				for j := i + 1; j < len(tokens); j++ {
-					switch tokens[j].Kind {
-					case scanner.Function, scanner.ParenOpen:
-						depth++
-					case scanner.ParenClose:
-						depth--
-						if depth == 0 {
-							dc, ok := resolveVarColor(
-								tokens[i:j+1],
-								resolver,
-							)
-							if !ok {
-								return Color{}, j + 1, false
-							}
-							return dc.Color, j + 1, true
-						}
-					}
+				j := skipPastCloseParen(tokens, i)
+				if j == i {
+					return Color{}, i, false
 				}
-				return Color{}, i, false
+				dc, ok := resolveVarColor(
+					tokens[i:j+1],
+					resolver,
+				)
+				if !ok {
+					return Color{}, j + 1, false
+				}
+				return dc.Color, j + 1, true
 			}
 		}
 

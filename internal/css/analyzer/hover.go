@@ -234,6 +234,39 @@ func hoverVarFunction(
 	return HoverResult{}
 }
 
+// baselineLabel returns a human-readable label for
+// baseline browser availability, or empty string if
+// baseline is not set.
+func baselineLabel(bl data.Baseline) string {
+	if bl.Status == "" {
+		return ""
+	}
+	switch bl.Status {
+	case "high":
+		year := extractYear(bl.HighDate)
+		if year != "" {
+			return "Widely available across major browsers (since " + year + ")"
+		}
+		return "Widely available across major browsers"
+	case "low":
+		year := extractYear(bl.LowDate)
+		if year != "" {
+			return "Newly available across major browsers (since " + year + ")"
+		}
+		return "Newly available across major browsers"
+	case "false":
+		return "Limited availability across major browsers"
+	}
+	return ""
+}
+
+func extractYear(date string) string {
+	if len(date) >= 4 {
+		return date[:4]
+	}
+	return ""
+}
+
 func hoverProperty(name string) (string, bool) {
 	if strings.HasPrefix(name, "--") {
 		return "", false
@@ -252,6 +285,13 @@ func hoverProperty(name string) (string, bool) {
 
 	if prop.IsExperimental() {
 		b.WriteString("\n\n*Experimental — limited browser support*")
+	}
+
+	if !prop.IsExperimental() {
+		if label := baselineLabel(prop.Baseline); label != "" {
+			b.WriteString("\n\n")
+			b.WriteString(label)
+		}
 	}
 
 	if len(prop.Values) > 0 {
@@ -282,6 +322,14 @@ func hoverAtKeyword(
 	b.WriteString(rule.Name)
 	b.WriteString("**\n\n")
 	b.WriteString(rule.Description)
+
+	if !rule.IsExperimental() {
+		if label := baselineLabel(rule.Baseline); label != "" {
+			b.WriteString("\n\n")
+			b.WriteString(label)
+		}
+	}
+
 	return b.String(), true
 }
 
@@ -354,8 +402,14 @@ func hoverSelector(
 						part.Token.Value,
 					)
 					if pc != nil {
-						result = "**:" + pc.Name +
+						h := "**:" + pc.Name +
 							"**\n\n" + pc.Description
+						if !pc.IsExperimental() {
+							if label := baselineLabel(pc.Baseline); label != "" {
+								h += "\n\n" + label
+							}
+						}
+						result = h
 						found = true
 						return false
 					}
@@ -363,8 +417,14 @@ func hoverSelector(
 						part.Token.Value,
 					)
 					if pe != nil {
-						result = "**::" + pe.Name +
+						h := "**::" + pe.Name +
 							"**\n\n" + pe.Description
+						if !pe.IsExperimental() {
+							if label := baselineLabel(pe.Baseline); label != "" {
+								h += "\n\n" + label
+							}
+						}
+						result = h
 						found = true
 						return false
 					}

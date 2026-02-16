@@ -7,6 +7,8 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
+
+	"github.com/toba/go-css-lsp/internal/css/analyzer"
 )
 
 var filesOpenedByEditor = make(map[string]string)
@@ -229,7 +231,9 @@ func ProcessInitializeRequest(
 				ReferencesProvider:     true,
 				CodeActionProvider: &CodeActionOptions{
 					CodeActionKinds: []string{
-						"quickfix", "refactor", "source.fixAll",
+						analyzer.CodeActionQuickFix,
+						analyzer.CodeActionRefactor,
+						analyzer.CodeActionSourceFixAll,
 					},
 				},
 				DocumentHighlightProvider:  true,

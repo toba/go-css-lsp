@@ -211,23 +211,7 @@ func (f *formatter) writeSelector(sl *parser.SelectorList) {
 }
 
 func (f *formatter) writeSingleSelector(sel *parser.Selector) {
-	for i, part := range sel.Parts {
-		if part.Combinator != "" && part.Combinator != " " {
-			if i > 0 {
-				f.buf.WriteByte(' ')
-			}
-			f.buf.WriteString(part.Combinator)
-			f.buf.WriteByte(' ')
-		} else if i > 0 && part.Combinator == " " {
-			f.buf.WriteByte(' ')
-		}
-
-		if part.Token.Kind != scanner.EOF {
-			f.buf.WriteString(
-				string(f.src[part.Token.Offset:part.Token.End]),
-			)
-		}
-	}
+	f.writeSingleSelectorTo(&f.buf, sel)
 }
 
 func (f *formatter) formatDeclaration(
@@ -241,7 +225,7 @@ func (f *formatter) formatDeclaration(
 
 		lineLen := f.indentWidth() + len(decl.Property.Value) + 2 + len(valStr) + 1
 		if decl.Important {
-			lineLen += 11 // " !important"
+			lineLen += len(" !important")
 		}
 
 		commaIndices, commaDepth := f.shallowestCommaIndices(decl.Value)
@@ -443,25 +427,7 @@ func (f *formatter) writeValueMultiLine(
 }
 
 func (f *formatter) writeValue(v *parser.Value) {
-	prevEnd := -1
-	prevKind := scanner.EOF
-	for _, tok := range v.Tokens {
-		if tok.Kind == scanner.Whitespace {
-			continue
-		}
-		if prevEnd >= 0 && tok.Offset > prevEnd {
-			if tok.Kind != scanner.ParenClose &&
-				prevKind != scanner.Function &&
-				prevKind != scanner.ParenOpen {
-				f.buf.WriteByte(' ')
-			}
-		}
-		f.buf.WriteString(
-			string(f.src[tok.Offset:tok.End]),
-		)
-		prevEnd = tok.End
-		prevKind = tok.Kind
-	}
+	f.writeValueTo(&f.buf, v)
 }
 
 func (f *formatter) formatAtRule(ar *parser.AtRule) {

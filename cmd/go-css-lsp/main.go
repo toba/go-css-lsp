@@ -58,6 +58,13 @@ func (s *workspaceStore) getRawFile(
 
 const serverName = "go-css-lsp"
 
+// panicStackBufSize is the buffer size for capturing goroutine
+// stack traces on panic recovery.
+const panicStackBufSize = 4096
+
+// markupKindMarkdown is the LSP MarkupKind for Markdown.
+const markupKindMarkdown = "markdown"
+
 // modeFromString converts a setting string to a mode enum.
 // Unrecognized values default to warn.
 func modeFromString[T ~int](s string, ignore, err, warn T) T {
@@ -204,7 +211,7 @@ func handleRequest(
 ) (response []byte, isRequestResponse bool) {
 	defer func() {
 		if r := recover(); r != nil {
-			buf := make([]byte, 4096)
+			buf := make([]byte, panicStackBufSize)
 			n := runtime.Stack(buf, false)
 			slog.Error("panic in request handler",
 				slog.String("method", method),
@@ -383,25 +390,15 @@ func processHover(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.HoverParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling hover request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.HoverParams](data, "hover")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalNullResult(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	hover := css.Hover(
@@ -419,7 +416,7 @@ func processHover(
 	if hover.Found {
 		hr := &lsp.HoverResult{
 			Contents: lsp.MarkupContent{
-				Kind:  "markdown",
+				Kind:  markupKindMarkdown,
 				Value: hover.Content,
 			},
 		}
@@ -432,15 +429,7 @@ func processHover(
 		res.Result = hr
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling hover response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "hover")
 }
 
 // processCompletion handles textDocument/completion requests.
@@ -450,25 +439,15 @@ func processCompletion(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.CompletionParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling completion request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.CompletionParams](data, "completion")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalNullResult(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	items := css.Completions(
@@ -490,7 +469,7 @@ func processCompletion(
 		}
 		if item.Documentation != "" {
 			lspItems[i].Documentation = &lsp.MarkupContent{
-				Kind:  "markdown",
+				Kind:  markupKindMarkdown,
 				Value: item.Documentation,
 			}
 		}
@@ -505,15 +484,7 @@ func processCompletion(
 		},
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling completion response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "completion")
 }
 
 // processDocumentColor handles textDocument/documentColor.
@@ -523,25 +494,15 @@ func processDocumentColor(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.DocumentColorParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling documentColor request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.DocumentColorParams](data, "documentColor")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	docColors := css.DocumentColorsResolved(
@@ -569,26 +530,14 @@ func processDocumentColor(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling documentColor response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "documentColor")
 }
 
 // processColorPresentation handles
 // textDocument/colorPresentation.
 func processColorPresentation(data []byte) []byte {
-	var req lsp.RequestMessage[lsp.ColorPresentationParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling colorPresentation request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.ColorPresentationParams](data, "colorPresentation")
+	if !ok {
 		return nil
 	}
 
@@ -617,15 +566,7 @@ func processColorPresentation(data []byte) []byte {
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling colorPresentation response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "colorPresentation")
 }
 
 // processSelectionRange handles textDocument/selectionRange.
@@ -635,25 +576,15 @@ func processSelectionRange(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.SelectionRangeParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling selectionRange request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.SelectionRangeParams](data, "selectionRange")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	result := make([]lsp.LSPSelectionRange, len(req.Params.Positions))
@@ -672,15 +603,7 @@ func processSelectionRange(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling selectionRange response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "selectionRange")
 }
 
 func convertSelectionRange(
@@ -712,25 +635,15 @@ func processPrepareRename(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.TextDocumentPositionParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling prepareRename request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.TextDocumentPositionParams](data, "prepareRename")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalNullResult(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	loc, found := css.PrepareRename(
@@ -753,15 +666,7 @@ func processPrepareRename(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling prepareRename response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "prepareRename")
 }
 
 // processRename handles textDocument/rename.
@@ -771,25 +676,15 @@ func processRename(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.RenameParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling rename request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.RenameParams](data, "rename")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalNullResult(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	edits := css.Rename(
@@ -825,15 +720,7 @@ func processRename(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling rename response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "rename")
 }
 
 // processFormatting handles textDocument/formatting.
@@ -843,25 +730,15 @@ func processFormatting(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.DocumentFormattingParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling formatting request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.DocumentFormattingParams](data, "formatting")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	fmtOpts := analyzer.FormatOptions{
@@ -897,15 +774,7 @@ func processFormatting(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling formatting response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "formatting")
 }
 
 // processDocumentHighlight handles textDocument/documentHighlight.
@@ -915,25 +784,15 @@ func processDocumentHighlight(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.TextDocumentPositionParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling documentHighlight request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.TextDocumentPositionParams](data, "documentHighlight")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	highlights := css.DocumentHighlights(
@@ -958,15 +817,7 @@ func processDocumentHighlight(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling documentHighlight response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "documentHighlight")
 }
 
 // processFoldingRange handles textDocument/foldingRange.
@@ -976,25 +827,15 @@ func processFoldingRange(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.FoldingRangeParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling foldingRange request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.FoldingRangeParams](data, "foldingRange")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	ranges := css.FoldingRanges(ss, src)
@@ -1015,15 +856,7 @@ func processFoldingRange(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling foldingRange response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "foldingRange")
 }
 
 // processDocumentLink handles textDocument/documentLink.
@@ -1033,25 +866,15 @@ func processDocumentLink(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.DocumentLinkParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling documentLink request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.DocumentLinkParams](data, "documentLink")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	links := css.DocumentLinks(ss, src)
@@ -1071,15 +894,7 @@ func processDocumentLink(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling documentLink response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "documentLink")
 }
 
 // containsOnly checks if a code action kind is in the only
@@ -1134,15 +949,7 @@ func processFixAll(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling fixAll response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "fixAll")
 }
 
 // processCodeAction handles textDocument/codeAction.
@@ -1152,12 +959,8 @@ func processCodeAction(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.CodeActionParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling codeAction request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.CodeActionParams](data, "codeAction")
+	if !ok {
 		return nil
 	}
 
@@ -1237,15 +1040,7 @@ func processCodeAction(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling codeAction response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "codeAction")
 }
 
 // processReferences handles textDocument/references.
@@ -1255,25 +1050,15 @@ func processReferences(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.ReferenceParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling references request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.ReferenceParams](data, "references")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	refs := css.References(
@@ -1298,15 +1083,7 @@ func processReferences(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling references response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "references")
 }
 
 // processDefinition handles textDocument/definition.
@@ -1316,25 +1093,15 @@ func processDefinition(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.TextDocumentPositionParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling definition request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.TextDocumentPositionParams](data, "definition")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalNullResult(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	defResult, found := css.Definition(
@@ -1418,15 +1185,7 @@ func marshalDefinitionResult(
 		Id:      id,
 		Result:  result,
 	}
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling definition response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "definition")
 }
 
 // processDocumentSymbol handles textDocument/documentSymbol.
@@ -1436,25 +1195,15 @@ func processDocumentSymbol(
 	textFromClient map[string][]byte,
 	mu *sync.Mutex,
 ) []byte {
-	var req lsp.RequestMessage[lsp.DocumentSymbolParams]
-	if err := json.Unmarshal(data, &req); err != nil {
-		slog.Warn(
-			"Error unmarshalling documentSymbol request: " +
-				err.Error(),
-		)
+	req, ok := unmarshalRequest[lsp.DocumentSymbolParams](data, "documentSymbol")
+	if !ok {
 		return nil
 	}
 
 	uri := req.Params.TextDocument.Uri
-	src := getFileContent(uri, storage, textFromClient, mu)
+	src, ss := resolveDocument(uri, storage, textFromClient, mu)
 	if src == nil {
 		return marshalEmptyArray(req.JsonRpc, req.Id)
-	}
-
-	ss := storage.getParsedFile(uri)
-	if ss == nil {
-		result := css.Parse(src)
-		ss = result.Stylesheet
 	}
 
 	symbols := css.DocumentSymbols(ss, src)
@@ -1466,15 +1215,7 @@ func processDocumentSymbol(
 		Result:  result,
 	}
 
-	out, err := json.Marshal(res)
-	if err != nil {
-		slog.Warn(
-			"Error marshalling documentSymbol response: " +
-				err.Error(),
-		)
-		return nil
-	}
-	return out
+	return marshalResponse(res, "documentSymbol")
 }
 
 func convertSymbols(
@@ -1501,6 +1242,57 @@ func convertSymbols(
 		}
 	}
 	return result
+}
+
+// unmarshalRequest decodes a JSON-RPC request, logging a
+// warning on failure.
+func unmarshalRequest[T any](
+	data []byte, label string,
+) (lsp.RequestMessage[T], bool) {
+	var req lsp.RequestMessage[T]
+	if err := json.Unmarshal(data, &req); err != nil {
+		slog.Warn(
+			"Error unmarshalling " + label +
+				" request: " + err.Error(),
+		)
+		return req, false
+	}
+	return req, true
+}
+
+// marshalResponse encodes a JSON-RPC response, logging a
+// warning on failure.
+func marshalResponse(v any, label string) []byte {
+	out, err := json.Marshal(v)
+	if err != nil {
+		slog.Warn(
+			"Error marshalling " + label +
+				" response: " + err.Error(),
+		)
+		return nil
+	}
+	return out
+}
+
+// resolveDocument retrieves file content and parsed stylesheet
+// for a document URI. Returns nil content if the file is not
+// available.
+func resolveDocument(
+	uri string,
+	storage *workspaceStore,
+	textFromClient map[string][]byte,
+	mu *sync.Mutex,
+) ([]byte, *parser.Stylesheet) {
+	src := getFileContent(uri, storage, textFromClient, mu)
+	if src == nil {
+		return nil, nil
+	}
+	ss := storage.getParsedFile(uri)
+	if ss == nil {
+		result := css.Parse(src)
+		ss = result.Stylesheet
+	}
+	return src, ss
 }
 
 func marshalEmptyArray(
@@ -1596,7 +1388,7 @@ func processDiagnosticNotification(
 ) {
 	defer func() {
 		if r := recover(); r != nil {
-			buf := make([]byte, 4096)
+			buf := make([]byte, panicStackBufSize)
 			n := runtime.Stack(buf, false)
 			slog.Error("panic in diagnostic goroutine",
 				slog.Any("panic", r),

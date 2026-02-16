@@ -3,25 +3,101 @@
 package data
 
 var AtRules = []AtRuleDef{
-	{Name: "charset", Description: "Defines character set of the document."},
-	{Name: "container", Description: "The @container CSS at-rule is a conditional group rule that applies styles to a containment context."},
-	{Name: "counter-style", Description: "Defines a custom counter style."},
-	{Name: "document", Description: "The @document CSS at-rule restricts the style rules contained within it based on the URL of the document. It is designed primarily for user-defined style sheets (see userchrome.org for more information), though it can be used on author-defined style sheets, too."},
-	{Name: "font-face", Description: "Allows for linking to fonts that are automatically activated when needed. This permits authors to work around the limitation of 'web-safe' fonts, allowing for consistent rendering independent of the fonts available in a given user's environment."},
-	{Name: "font-feature-values", Description: "Defines named values for the indices used to select alternate glyphs for a given font family."},
-	{Name: "font-palette-values", Description: "The @font-palette-values CSS at-rule allows you to customize the default values of font-palette created by the font-maker."},
-	{Name: "import", Description: "Includes content of another file."},
-	{Name: "keyframes", Description: "Defines set of animation key frames."},
-	{Name: "layer", Description: "Declare a cascade layer and the order of precedence in case of multiple cascade layers."},
-	{Name: "media", Description: "Defines a stylesheet for a particular media type."},
-	{Name: "namespace", Description: "Declares a prefix and associates it with a namespace name."},
-	{Name: "page", Description: "Directive defines various page parameters."},
-	{Name: "position-try", Description: "The @position-try CSS at-rule is used to define a custom position try fallback option, which can be used to define positioning and alignment for anchor-positioned elements. One or more sets of position try fallback options can be applied to the anchored element via the position-try-fallbacks property or position-try shorthand. When the positioned element is moved to a position where it starts to overflow its containing block or the viewport, the browser will select the first position try fallback option it finds that places the positioned element fully back on-screen."},
-	{Name: "property", Description: "Describes the aspect of custom properties and variables."},
-	{Name: "scope", Description: "The @scope CSS at-rule enables you to select elements in specific DOM subtrees, targeting elements precisely without writing overly-specific selectors that are hard to override, and without coupling your selectors too tightly to the DOM structure."},
-	{Name: "starting-style", Description: "The @starting-style CSS at-rule is used to define starting values for properties set on an element that you want to transition from when the element receives its first style update, i.e., when an element is first displayed on a previously loaded page."},
-	{Name: "supports", Description: "A conditional group rule whose condition tests whether the user agent supports CSS property:value pairs."},
-	{Name: "view-transition", Description: "The @view-transition CSS at-rule is used to opt in the current and destination documents to undergo a view transition, in the case of a cross-document navigation."},
+	{
+		Name: "charset",
+		Description: "Defines character set of the document.",
+		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+	},
+	{
+		Name: "container",
+		Description: "The @container CSS at-rule is a conditional group rule that applies styles to a containment context.",
+		Baseline: Baseline{Status: "high", LowDate: "2023-02-14", HighDate: "2025-08-14"},
+	},
+	{
+		Name: "counter-style",
+		Description: "Defines a custom counter style.",
+		Baseline: Baseline{Status: "low", LowDate: "2023-09-18"},
+	},
+	{
+		Name: "document",
+		Description: "The @document CSS at-rule restricts the style rules contained within it based on the URL of the document. It is designed primarily for user-defined style sheets (see userchrome.org for more information), though it can be used on author-defined style sheets, too.",
+		Baseline: Baseline{Status: "false"},
+	},
+	{
+		Name: "font-face",
+		Description: "Allows for linking to fonts that are automatically activated when needed. This permits authors to work around the limitation of 'web-safe' fonts, allowing for consistent rendering independent of the fonts available in a given user's environment.",
+		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+	},
+	{
+		Name: "font-feature-values",
+		Description: "Defines named values for the indices used to select alternate glyphs for a given font family.",
+		Baseline: Baseline{Status: "high", LowDate: "2023-03-13", HighDate: "2025-09-13"},
+	},
+	{
+		Name: "font-palette-values",
+		Description: "The @font-palette-values CSS at-rule allows you to customize the default values of font-palette created by the font-maker.",
+		Baseline: Baseline{Status: "high", LowDate: "2022-11-15", HighDate: "2025-05-15"},
+	},
+	{
+		Name: "import",
+		Description: "Includes content of another file.",
+		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+	},
+	{
+		Name: "keyframes",
+		Description: "Defines set of animation key frames.",
+		Baseline: Baseline{Status: "high", LowDate: "2015-09-30", HighDate: "2018-03-30"},
+	},
+	{
+		Name: "layer",
+		Description: "Declare a cascade layer and the order of precedence in case of multiple cascade layers.",
+		Baseline: Baseline{Status: "high", LowDate: "2022-03-14", HighDate: "2024-09-14"},
+	},
+	{
+		Name: "media",
+		Description: "Defines a stylesheet for a particular media type.",
+		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+	},
+	{
+		Name: "namespace",
+		Description: "Declares a prefix and associates it with a namespace name.",
+		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+	},
+	{
+		Name: "page",
+		Description: "Directive defines various page parameters.",
+		Baseline: Baseline{Status: "low", LowDate: "2024-12-11"},
+	},
+	{
+		Name: "position-try",
+		Description: "The @position-try CSS at-rule is used to define a custom position try fallback option, which can be used to define positioning and alignment for anchor-positioned elements. One or more sets of position try fallback options can be applied to the anchored element via the position-try-fallbacks property or position-try shorthand. When the positioned element is moved to a position where it starts to overflow its containing block or the viewport, the browser will select the first position try fallback option it finds that places the positioned element fully back on-screen.",
+		Baseline: Baseline{Status: "false"},
+	},
+	{
+		Name: "property",
+		Description: "Describes the aspect of custom properties and variables.",
+		Baseline: Baseline{Status: "low", LowDate: "2024-07-09"},
+	},
+	{
+		Name: "scope",
+		Description: "The @scope CSS at-rule enables you to select elements in specific DOM subtrees, targeting elements precisely without writing overly-specific selectors that are hard to override, and without coupling your selectors too tightly to the DOM structure.",
+		Baseline: Baseline{Status: "false"},
+	},
+	{
+		Name: "starting-style",
+		Description: "The @starting-style CSS at-rule is used to define starting values for properties set on an element that you want to transition from when the element receives its first style update, i.e., when an element is first displayed on a previously loaded page.",
+		Baseline: Baseline{Status: "low", LowDate: "2024-08-06"},
+	},
+	{
+		Name: "supports",
+		Description: "A conditional group rule whose condition tests whether the user agent supports CSS property:value pairs.",
+		Baseline: Baseline{Status: "high", LowDate: "2015-09-30", HighDate: "2018-03-30"},
+	},
+	{
+		Name: "view-transition",
+		Description: "The @view-transition CSS at-rule is used to opt in the current and destination documents to undergo a view transition, in the case of a cross-document navigation.",
+		Baseline: Baseline{Status: "false"},
+	},
 }
 
 var atRuleMap = buildAtRuleMap()

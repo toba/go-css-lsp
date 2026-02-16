@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"strconv"
 )
 
@@ -21,9 +21,8 @@ func ReceiveInput(input io.Reader) *bufio.Scanner {
 func SendOutput(output io.Writer, response []byte) {
 	_, err := output.Write(response)
 	if err != nil {
-		log.Printf(
-			"Error while writing to output: %s",
-			err.Error(),
+		slog.Warn(
+			"error writing to output: " + err.Error(),
 		)
 	}
 }

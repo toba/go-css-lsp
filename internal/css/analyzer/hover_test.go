@@ -239,6 +239,69 @@ func (m mapResolver) ResolveVariable(
 	return v, ok
 }
 
+func TestHoverPropertyBaseline(t *testing.T) {
+	src := []byte(`body { color: red; }`)
+	ss, errs := parser.Parse(src)
+	if len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	hr := Hover(ss, src, 8)
+	if !hr.Found {
+		t.Fatal("expected hover to find content")
+	}
+	if !strings.Contains(
+		hr.Content, "Widely available",
+	) {
+		t.Errorf(
+			"expected baseline info, got %q",
+			hr.Content,
+		)
+	}
+}
+
+func TestHoverPropertyNoBaseline(t *testing.T) {
+	// Custom properties don't have baseline info
+	src := []byte(`:root { --my-var: red; }`)
+	ss, _ := parser.Parse(src)
+
+	hr := Hover(ss, src, 10)
+	if hr.Found && strings.Contains(
+		hr.Content, "available",
+	) {
+		t.Error(
+			"custom property should not show baseline",
+		)
+	}
+}
+
+func TestHoverExperimentalNoBaseline(t *testing.T) {
+	// Experimental properties should show experimental
+	// tag but suppress baseline info.
+	src := []byte(`body { field-sizing: content; }`)
+	ss, _ := parser.Parse(src)
+
+	// "field-sizing" starts at byte 7
+	hr := Hover(ss, src, 8)
+	if !hr.Found {
+		t.Skip(
+			"field-sizing not in data, skipping",
+		)
+	}
+	if !strings.Contains(hr.Content, "Experimental") {
+		t.Errorf(
+			"expected Experimental tag, got %q",
+			hr.Content,
+		)
+	}
+	if strings.Contains(hr.Content, "available") {
+		t.Error(
+			"experimental property should not show " +
+				"baseline info",
+		)
+	}
+}
+
 func TestHoverVarFunctionToken(t *testing.T) {
 	src := []byte(
 		`:root { --brand: blue; }

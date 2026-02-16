@@ -226,6 +226,87 @@ func TestCompleteDeprecatedPropertyTagged(t *testing.T) {
 	t.Error("expected 'clip' in property completions")
 }
 
+func TestCompleteMediaFeatures(t *testing.T) {
+	src := []byte("@media ()")
+	ss, _ := parser.Parse(src)
+
+	// offset 8 is inside the parens: @media (|)
+	items := Complete(ss, src, 8, LintOptions{})
+
+	var hasWidth, hasPrefers bool
+	for _, item := range items {
+		if item.Label == "width" {
+			hasWidth = true
+		}
+		if item.Label == "prefers-color-scheme" {
+			hasPrefers = true
+		}
+	}
+	if !hasWidth {
+		t.Error("expected 'width' in media feature completions")
+	}
+	if !hasPrefers {
+		t.Error(
+			"expected 'prefers-color-scheme' in media " +
+				"feature completions",
+		)
+	}
+}
+
+func TestCompleteMediaFeaturesWithPrefix(t *testing.T) {
+	src := []byte("@media (wi)")
+	ss, _ := parser.Parse(src)
+
+	// offset 10 is after "wi" inside parens
+	items := Complete(ss, src, 10, LintOptions{})
+
+	found := false
+	for _, item := range items {
+		if item.Label == "width" {
+			found = true
+		}
+		if item.Label == "prefers-color-scheme" {
+			t.Error(
+				"prefers-color-scheme should not match " +
+					"prefix 'wi'",
+			)
+		}
+	}
+	if !found {
+		t.Error(
+			"expected 'width' in filtered media feature " +
+				"completions",
+		)
+	}
+}
+
+func TestCompleteMediaValues(t *testing.T) {
+	src := []byte("@media (prefers-color-scheme: )")
+	ss, _ := parser.Parse(src)
+
+	// offset 29 is after ": " inside parens
+	items := Complete(ss, src, 29, LintOptions{})
+
+	expected := map[string]bool{
+		"light": false,
+		"dark":  false,
+	}
+	for _, item := range items {
+		if _, ok := expected[item.Label]; ok {
+			expected[item.Label] = true
+		}
+	}
+	for name, found := range expected {
+		if !found {
+			t.Errorf(
+				"expected %q in media value completions "+
+					"for prefers-color-scheme",
+				name,
+			)
+		}
+	}
+}
+
 func TestCompleteDeprecatedPropertyNotTaggedWhenIgnored(
 	t *testing.T,
 ) {

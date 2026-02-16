@@ -20,11 +20,9 @@ func TestConcurrentSendToLspClient_Race(t *testing.T) {
 	const messagesPerGoroutine = 50
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for g := range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range messagesPerGoroutine {
 				msg := fmt.Appendf(nil,
 					`{"jsonrpc":"2.0","method":"test","params":{"g":%d,"i":%d}}`,
@@ -34,7 +32,7 @@ func TestConcurrentSendToLspClient_Race(t *testing.T) {
 				SendToLspClient(&buf, msg)
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -72,11 +70,9 @@ func TestConcurrentSendToLspClient_FrameIntegrity(t *testing.T) {
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for g := range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range messagesPerGoroutine {
 				msg := fmt.Appendf(
 					nil,
@@ -88,7 +84,7 @@ func TestConcurrentSendToLspClient_FrameIntegrity(t *testing.T) {
 				SendToLspClient(pw, msg)
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 
 	// Collect all output into a buffer so we can parse it

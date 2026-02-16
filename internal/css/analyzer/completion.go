@@ -37,6 +37,10 @@ func Complete(
 		return completePseudoElements(ctx.prefix, tag, tagDep)
 	case contextSelector:
 		return completeSelectorStart(ctx.prefix)
+	case contextMediaFeature:
+		return completeMediaFeatures(ctx.prefix)
+	case contextMediaValue:
+		return completeMediaValues(ctx.mediaFeatureName, ctx.prefix)
 	default:
 		return completeTopLevel(ctx.prefix, tag, tagDep)
 	}
@@ -53,12 +57,15 @@ const (
 	contextPseudoClass
 	contextPseudoElement
 	contextSelector
+	contextMediaFeature
+	contextMediaValue
 )
 
 type completionContext struct {
-	kind         contextKind
-	prefix       string
-	propertyName string
+	kind             contextKind
+	prefix           string
+	propertyName     string
+	mediaFeatureName string // for contextMediaValue
 }
 
 func determineContext(
@@ -77,6 +84,11 @@ func determineContext(
 
 	// Look backwards from offset for context clues
 	text := string(src[:offset])
+
+	// Check for media feature/value context: @media (...|...)
+	if ctx, ok := detectMediaContext(text); ok {
+		return ctx
+	}
 
 	// Check for @ at-rule context
 	atIdx := strings.LastIndex(text, "@")
@@ -153,6 +165,22 @@ func determineContext(
 	}
 }
 
+// tagCompletionItem annotates a completion item with
+// experimental/deprecated markers based on its status.
+func tagCompletionItem(
+	item *CompletionItem,
+	status data.StatusInfo,
+	tagExperimental, tagDeprecated bool,
+) {
+	if tagExperimental && status.IsExperimental() {
+		item.Detail = "(experimental) " + item.Detail
+	}
+	if tagDeprecated && status.IsDeprecated() {
+		item.Detail = "(deprecated) " + item.Detail
+		item.Deprecated = true
+	}
+}
+
 func completeProperties(
 	prefix string, tagExperimental, tagDeprecated bool,
 ) []CompletionItem {
@@ -171,13 +199,10 @@ func completeProperties(
 			Documentation: prop.MDN,
 			InsertText:    prop.Name + ": ",
 		}
-		if tagExperimental && prop.IsExperimental() {
-			item.Detail = "(experimental) " + item.Detail
-		}
-		if tagDeprecated && prop.IsDeprecated() {
-			item.Detail = "(deprecated) " + item.Detail
-			item.Deprecated = true
-		}
+		tagCompletionItem(
+			&item, prop.StatusInfo,
+			tagExperimental, tagDeprecated,
+		)
 		items = append(items, item)
 	}
 
@@ -262,13 +287,10 @@ func completeAtRules(
 			Kind:   KindKeyword,
 			Detail: rule.Description,
 		}
-		if tagExperimental && rule.IsExperimental() {
-			item.Detail = "(experimental) " + item.Detail
-		}
-		if tagDeprecated && rule.IsDeprecated() {
-			item.Detail = "(deprecated) " + item.Detail
-			item.Deprecated = true
-		}
+		tagCompletionItem(
+			&item, rule.StatusInfo,
+			tagExperimental, tagDeprecated,
+		)
 		items = append(items, item)
 	}
 
@@ -291,13 +313,10 @@ func completePseudoClasses(
 			Kind:   KindKeyword,
 			Detail: pc.Description,
 		}
-		if tagExperimental && pc.IsExperimental() {
-			item.Detail = "(experimental) " + item.Detail
-		}
-		if tagDeprecated && pc.IsDeprecated() {
-			item.Detail = "(deprecated) " + item.Detail
-			item.Deprecated = true
-		}
+		tagCompletionItem(
+			&item, pc.StatusInfo,
+			tagExperimental, tagDeprecated,
+		)
 		items = append(items, item)
 	}
 
@@ -320,13 +339,10 @@ func completePseudoElements(
 			Kind:   KindKeyword,
 			Detail: pe.Description,
 		}
-		if tagExperimental && pe.IsExperimental() {
-			item.Detail = "(experimental) " + item.Detail
-		}
-		if tagDeprecated && pe.IsDeprecated() {
-			item.Detail = "(deprecated) " + item.Detail
-			item.Deprecated = true
-		}
+		tagCompletionItem(
+			&item, pe.StatusInfo,
+			tagExperimental, tagDeprecated,
+		)
 		items = append(items, item)
 	}
 
@@ -368,6 +384,169 @@ func completeTopLevel(
 ) []CompletionItem {
 	items := completeSelectorStart(prefix)
 	items = append(items, completeAtRules(prefix, tagExperimental, tagDeprecated)...)
+	return items
+}
+
+// detectMediaContext checks if the cursor is inside a
+// @media (...) expression and returns the appropriate
+// context for feature name or value completion.
+func detectMediaContext(
+	text string,
+) (completionContext, bool) {
+	// Find the last unmatched ( before cursor
+	parenDepth := 0
+	openIdx := -1
+	for i := len(text) - 1; i >= 0; i-- {
+		switch text[i] {
+		case ')':
+			parenDepth++
+		case '(':
+			if parenDepth > 0 {
+				parenDepth--
+			} else {
+				openIdx = i
+			}
+		}
+		if openIdx >= 0 {
+			break
+		}
+	}
+	if openIdx < 0 {
+		return completionContext{}, false
+	}
+
+	// Check if @media precedes the paren (possibly with
+	// whitespace, "not", "and", "or", other parens).
+	before := strings.TrimSpace(text[:openIdx])
+	if !isInMediaContext(before) {
+		return completionContext{}, false
+	}
+
+	// Inside @media (...). Check if there's a colon
+	// (feature: value context).
+	inside := text[openIdx+1:]
+	colonIdx := strings.LastIndex(inside, ":")
+	if colonIdx >= 0 {
+		featureName := strings.TrimSpace(inside[:colonIdx])
+		valuePrefix := strings.TrimSpace(inside[colonIdx+1:])
+		return completionContext{
+			kind:             contextMediaValue,
+			prefix:           valuePrefix,
+			mediaFeatureName: featureName,
+		}, true
+	}
+
+	// Feature name context
+	prefix := strings.TrimSpace(inside)
+	return completionContext{
+		kind:   contextMediaFeature,
+		prefix: prefix,
+	}, true
+}
+
+// isInMediaContext checks if the text before an opening
+// paren is part of a @media query.
+func isInMediaContext(before string) bool {
+	// Walk backwards through tokens like "and", "or",
+	// "not", "(", ")" to find @media.
+	s := before
+	for {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return false
+		}
+		// Check for @media directly
+		if strings.HasSuffix(s, "@media") {
+			return true
+		}
+		// Strip trailing keyword: and, or, not, only
+		for _, kw := range []string{
+			"and", "or", "not", "only",
+		} {
+			if strings.HasSuffix(s, kw) {
+				trimmed := strings.TrimSpace(
+					s[:len(s)-len(kw)],
+				)
+				if trimmed != s[:len(s)-len(kw)] ||
+					len(trimmed) < len(s) {
+					s = trimmed
+					continue
+				}
+			}
+		}
+		// Strip trailing ) and balanced parens
+		if strings.HasSuffix(s, ")") {
+			depth := 0
+			for i := len(s) - 1; i >= 0; i-- {
+				if s[i] == ')' {
+					depth++
+				} else if s[i] == '(' {
+					depth--
+					if depth == 0 {
+						s = strings.TrimSpace(s[:i])
+						break
+					}
+				}
+			}
+			if depth != 0 {
+				return false
+			}
+			continue
+		}
+		// Strip trailing comma
+		if strings.HasSuffix(s, ",") {
+			s = strings.TrimSpace(
+				s[:len(s)-1],
+			)
+			continue
+		}
+		return false
+	}
+}
+
+func completeMediaFeatures(
+	prefix string,
+) []CompletionItem {
+	var items []CompletionItem
+	prefix = strings.ToLower(prefix)
+
+	for _, f := range data.AllMediaFeatures() {
+		if prefix != "" &&
+			!strings.HasPrefix(f.Name, prefix) {
+			continue
+		}
+		items = append(items, CompletionItem{
+			Label:  f.Name,
+			Kind:   KindProperty,
+			Detail: f.Description,
+		})
+	}
+
+	return items
+}
+
+func completeMediaValues(
+	featureName, prefix string,
+) []CompletionItem {
+	var items []CompletionItem
+	prefix = strings.ToLower(prefix)
+
+	f := data.LookupMediaFeature(featureName)
+	if f == nil {
+		return nil
+	}
+
+	for _, v := range f.Values {
+		if prefix != "" &&
+			!strings.HasPrefix(v, prefix) {
+			continue
+		}
+		items = append(items, CompletionItem{
+			Label: v,
+			Kind:  KindValue,
+		})
+	}
+
 	return items
 }
 

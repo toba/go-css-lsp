@@ -4,7 +4,6 @@ linters:
   default: standard
   enable:
     - bodyclose
-    - copyloopvar
     - dupl
     - errcheck
     - errname

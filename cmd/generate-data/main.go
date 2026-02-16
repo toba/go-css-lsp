@@ -31,6 +31,7 @@ type cssProperty struct {
 	References  []cssReference  `json:"references"`
 	Values      []cssValue      `json:"values"`
 	Status      string          `json:"status"`
+	Baseline    *cssBaseline    `json:"baseline,omitempty"`
 }
 
 type cssAtDirective struct {
@@ -38,6 +39,18 @@ type cssAtDirective struct {
 	Description json.RawMessage `json:"description"`
 	References  []cssReference  `json:"references"`
 	Status      string          `json:"status"`
+	Baseline    *cssBaseline    `json:"baseline,omitempty"`
+	Descriptors []cssDescriptor `json:"descriptors,omitempty"`
+}
+
+type cssDescriptor struct {
+	Name        string          `json:"name"`
+	Description json.RawMessage `json:"description"`
+	References  []cssReference  `json:"references"`
+	Type        string          `json:"type"`
+	Values      []cssValue      `json:"values"`
+	Status      string          `json:"status"`
+	Baseline    *cssBaseline    `json:"baseline,omitempty"`
 }
 
 type cssPseudoClass struct {
@@ -45,6 +58,7 @@ type cssPseudoClass struct {
 	Description json.RawMessage `json:"description"`
 	References  []cssReference  `json:"references"`
 	Status      string          `json:"status"`
+	Baseline    *cssBaseline    `json:"baseline,omitempty"`
 }
 
 type cssPseudoElem struct {
@@ -52,6 +66,13 @@ type cssPseudoElem struct {
 	Description json.RawMessage `json:"description"`
 	References  []cssReference  `json:"references"`
 	Status      string          `json:"status"`
+	Baseline    *cssBaseline    `json:"baseline,omitempty"`
+}
+
+type cssBaseline struct {
+	Status           string `json:"status"`
+	BaselineLowDate  string `json:"baseline_low_date,omitempty"`
+	BaselineHighDate string `json:"baseline_high_date,omitempty"`
 }
 
 type cssReference struct {
@@ -116,6 +137,20 @@ func cssValuesFrom(names []string) []cssValue {
 
 func goStr(s string) string {
 	return fmt.Sprintf("%q", s)
+}
+
+func emitBaseline(b *strings.Builder, bl *cssBaseline) {
+	if bl == nil || bl.Status == "" {
+		return
+	}
+	b.WriteString("\t\tBaseline: Baseline{Status: " + goStr(bl.Status))
+	if bl.BaselineLowDate != "" {
+		b.WriteString(", LowDate: " + goStr(bl.BaselineLowDate))
+	}
+	if bl.BaselineHighDate != "" {
+		b.WriteString(", HighDate: " + goStr(bl.BaselineHighDate))
+	}
+	b.WriteString("},\n")
 }
 
 func main() {
@@ -206,6 +241,7 @@ func generateProperties(outDir string, props []cssProperty) {
 				"\t\tStatusInfo:  StatusInfo{Status: " + goStr(p.Status) + "},\n",
 			)
 		}
+		emitBaseline(&b, p.Baseline)
 
 		// Collect value keywords (skip vendor-prefixed).
 		var vals []string
@@ -270,15 +306,18 @@ func generateAtRules(outDir string, directives []cssAtDirective) {
 		// Strip leading @ for the name.
 		name := strings.TrimPrefix(a.Name, "@")
 
-		b.WriteString("\t{")
-		b.WriteString("Name: " + goStr(name))
+		b.WriteString("\t{\n")
+		b.WriteString("\t\tName: " + goStr(name) + ",\n")
 		if desc != "" {
-			b.WriteString(", Description: " + goStr(desc))
+			b.WriteString("\t\tDescription: " + goStr(desc) + ",\n")
 		}
 		if a.Status != "" {
-			b.WriteString(", StatusInfo: StatusInfo{Status: " + goStr(a.Status) + "}")
+			b.WriteString(
+				"\t\tStatusInfo: StatusInfo{Status: " + goStr(a.Status) + "},\n",
+			)
 		}
-		b.WriteString("},\n")
+		emitBaseline(&b, a.Baseline)
+		b.WriteString("\t},\n")
 	}
 
 	b.WriteString("}\n\n")
@@ -293,6 +332,81 @@ func generateAtRules(outDir string, directives []cssAtDirective) {
 
 	writeFile(filepath.Join(outDir, "at_rules_gen.go"), b.String())
 	fmt.Printf("  at_rules_gen.go: %d at-rules\n", len(filtered))
+
+	// Extract media features from @media descriptors.
+	generateMediaFeatures(outDir, directives)
+}
+
+func generateMediaFeatures(outDir string, directives []cssAtDirective) {
+	// Find the @media directive and extract its descriptors.
+	var descriptors []cssDescriptor
+	for _, a := range directives {
+		if a.Name == "@media" {
+			descriptors = a.Descriptors
+			break
+		}
+	}
+
+	// Filter out vendor-prefixed, obsolete, and nonstandard.
+	var filtered []cssDescriptor
+	for _, d := range descriptors {
+		if !isVendorPrefixed(d.Name) && !isDroppedStatus(d.Status) {
+			filtered = append(filtered, d)
+		}
+	}
+	slices.SortFunc(filtered, func(a, b cssDescriptor) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+
+	var b strings.Builder
+	b.WriteString(header)
+	b.WriteString("\n//nolint:dupword\nvar MediaFeatures = []MediaFeature{\n")
+
+	for _, d := range filtered {
+		desc := parseDescription(d.Description)
+
+		b.WriteString("\t{\n")
+		b.WriteString("\t\tName: " + goStr(d.Name) + ",\n")
+		if desc != "" {
+			b.WriteString("\t\tDescription: " + goStr(desc) + ",\n")
+		}
+		if d.Type != "" {
+			b.WriteString("\t\tType: " + goStr(d.Type) + ",\n")
+		}
+
+		// Collect values (skip vendor-prefixed).
+		var vals []string
+		for _, v := range d.Values {
+			if !strings.HasPrefix(v.Name, "-") {
+				vals = append(vals, v.Name)
+			}
+		}
+		if len(vals) > 0 {
+			b.WriteString("\t\tValues: []string{")
+			for i, v := range vals {
+				if i > 0 {
+					b.WriteString(", ")
+				}
+				b.WriteString(goStr(v))
+			}
+			b.WriteString("},\n")
+		}
+
+		b.WriteString("\t},\n")
+	}
+
+	b.WriteString("}\n\n")
+	b.WriteString("var mediaFeatureMap = buildMediaFeatureMap()\n\n")
+	b.WriteString("func buildMediaFeatureMap() map[string]MediaFeature {\n")
+	b.WriteString("\tm := make(map[string]MediaFeature, len(MediaFeatures))\n")
+	b.WriteString("\tfor _, f := range MediaFeatures {\n")
+	b.WriteString("\t\tm[f.Name] = f\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\treturn m\n")
+	b.WriteString("}\n")
+
+	writeFile(filepath.Join(outDir, "media_features_gen.go"), b.String())
+	fmt.Printf("  media_features_gen.go: %d media features\n", len(filtered))
 }
 
 func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseudoElem) {
@@ -330,15 +444,18 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 		name := strings.TrimPrefix(p.Name, "::")
 		name = strings.TrimPrefix(name, ":")
 
-		b.WriteString("\t{")
-		b.WriteString("Name: " + goStr(name))
+		b.WriteString("\t{\n")
+		b.WriteString("\t\tName: " + goStr(name) + ",\n")
 		if desc != "" {
-			b.WriteString(", Description: " + goStr(desc))
+			b.WriteString("\t\tDescription: " + goStr(desc) + ",\n")
 		}
 		if p.Status != "" {
-			b.WriteString(", StatusInfo: StatusInfo{Status: " + goStr(p.Status) + "}")
+			b.WriteString(
+				"\t\tStatusInfo: StatusInfo{Status: " + goStr(p.Status) + "},\n",
+			)
 		}
-		b.WriteString("},\n")
+		emitBaseline(&b, p.Baseline)
+		b.WriteString("\t},\n")
 	}
 	b.WriteString("}\n\n")
 
@@ -351,15 +468,18 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 		name := strings.TrimPrefix(p.Name, "::")
 		name = strings.TrimPrefix(name, ":")
 
-		b.WriteString("\t{")
-		b.WriteString("Name: " + goStr(name))
+		b.WriteString("\t{\n")
+		b.WriteString("\t\tName: " + goStr(name) + ",\n")
 		if desc != "" {
-			b.WriteString(", Description: " + goStr(desc))
+			b.WriteString("\t\tDescription: " + goStr(desc) + ",\n")
 		}
 		if p.Status != "" {
-			b.WriteString(", StatusInfo: StatusInfo{Status: " + goStr(p.Status) + "}")
+			b.WriteString(
+				"\t\tStatusInfo: StatusInfo{Status: " + goStr(p.Status) + "},\n",
+			)
 		}
-		b.WriteString("},\n")
+		emitBaseline(&b, p.Baseline)
+		b.WriteString("\t},\n")
 	}
 	b.WriteString("}\n\n")
 
