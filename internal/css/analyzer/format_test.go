@@ -1019,6 +1019,28 @@ func TestFormatDetect_PreservesBlankLineBetweenDeclarations(t *testing.T) {
 	}
 }
 
+func TestFormat_SlashSpacing(t *testing.T) {
+	// Slashes in values like grid-row: 2/3 should be spaced: 2 / 3
+	src := []byte(`.foo{grid-row:2/3;grid-column:2 / 3;font:12px/1.5 sans-serif;}`)
+	ss, _ := parser.Parse(src)
+
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+
+	expected := `.foo {
+  grid-row: 2 / 3;
+  grid-column: 2 / 3;
+  font: 12px / 1.5 sans-serif;
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
 func TestFormatPreserve_PreservesBlankLineBetweenDeclarations(t *testing.T) {
 	src := []byte(`.button {
   color: red;

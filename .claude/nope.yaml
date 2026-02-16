@@ -1,0 +1,16 @@
+rules:
+  - name: git-no-verify
+    pattern: 'git\s+.*--no-verify'
+    message: "--no-verify is never allowed - fix the issue that's failing the hook instead"
+
+  - name: git-checkout-switch
+    pattern: 'git\s+(checkout|switch)\s+'
+    message: "git checkout/switch not allowed - branch changes require user approval"
+
+  - name: git-commit-push
+    pattern: 'git\s+(commit|push)'
+    message: "git commit/push not allowed - only user should commit"
+
+  - name: todo-archive
+    pattern: 'todo\s+archive'
+    message: "todo archive not allowed - user must archive todos manually"

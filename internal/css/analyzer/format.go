@@ -325,23 +325,35 @@ func (f *formatter) writeValueMultiLine(
 		depth := 0
 		prevEnd := -1
 		prevKind := scanner.EOF
+		prevSlash := false
 		startIdx := 0
 		for i, tok := range v.Tokens {
 			if tok.Kind == scanner.Whitespace {
 				continue
 			}
-			if prevEnd >= 0 && tok.Offset > prevEnd {
-				if tok.Kind != scanner.ParenClose &&
-					prevKind != scanner.Function &&
-					prevKind != scanner.ParenOpen {
-					f.buf.WriteByte(' ')
+			slash := f.isSlashDelim(tok)
+			needSpace := false
+			if prevEnd >= 0 {
+				if tok.Offset > prevEnd {
+					if tok.Kind != scanner.ParenClose &&
+						prevKind != scanner.Function &&
+						prevKind != scanner.ParenOpen {
+						needSpace = true
+					}
 				}
+				if !needSpace && (slash || prevSlash) {
+					needSpace = true
+				}
+			}
+			if needSpace {
+				f.buf.WriteByte(' ')
 			}
 			f.buf.WriteString(
 				string(f.src[tok.Offset:tok.End]),
 			)
 			prevEnd = tok.End
 			prevKind = tok.Kind
+			prevSlash = slash
 			if tok.Kind == scanner.Function ||
 				tok.Kind == scanner.ParenOpen {
 				depth++
@@ -360,6 +372,7 @@ func (f *formatter) writeValueMultiLine(
 		afterBreak := true
 		prevEnd = -1
 		prevKind = scanner.EOF
+		prevSlash = false
 		for i := startIdx; i < len(v.Tokens); i++ {
 			tok := v.Tokens[i]
 			if tok.Kind == scanner.Whitespace {
@@ -371,15 +384,26 @@ func (f *formatter) writeValueMultiLine(
 				f.writeIndent()
 				prevEnd = tok.End
 				prevKind = tok.Kind
+				prevSlash = false
 				afterBreak = true
 				continue
 			}
-			if !afterBreak && prevEnd >= 0 && tok.Offset > prevEnd {
-				if tok.Kind != scanner.ParenClose &&
-					prevKind != scanner.Function &&
-					prevKind != scanner.ParenOpen {
-					f.buf.WriteByte(' ')
+			slash := f.isSlashDelim(tok)
+			needSpace := false
+			if !afterBreak && prevEnd >= 0 {
+				if tok.Offset > prevEnd {
+					if tok.Kind != scanner.ParenClose &&
+						prevKind != scanner.Function &&
+						prevKind != scanner.ParenOpen {
+						needSpace = true
+					}
 				}
+				if !needSpace && (slash || prevSlash) {
+					needSpace = true
+				}
+			}
+			if needSpace {
+				f.buf.WriteByte(' ')
 			}
 			afterBreak = false
 			f.buf.WriteString(
@@ -387,12 +411,14 @@ func (f *formatter) writeValueMultiLine(
 			)
 			prevEnd = tok.End
 			prevKind = tok.Kind
+			prevSlash = slash
 		}
 	} else {
 		f.writeIndent()
 
 		prevEnd := -1
 		prevKind := scanner.EOF
+		prevSlash := false
 		afterBreak := true
 		for i, tok := range v.Tokens {
 			if tok.Kind == scanner.Whitespace {
@@ -404,15 +430,26 @@ func (f *formatter) writeValueMultiLine(
 				f.writeIndent()
 				prevEnd = tok.End
 				prevKind = tok.Kind
+				prevSlash = false
 				afterBreak = true
 				continue
 			}
-			if !afterBreak && prevEnd >= 0 && tok.Offset > prevEnd {
-				if tok.Kind != scanner.ParenClose &&
-					prevKind != scanner.Function &&
-					prevKind != scanner.ParenOpen {
-					f.buf.WriteByte(' ')
+			slash := f.isSlashDelim(tok)
+			needSpace := false
+			if !afterBreak && prevEnd >= 0 {
+				if tok.Offset > prevEnd {
+					if tok.Kind != scanner.ParenClose &&
+						prevKind != scanner.Function &&
+						prevKind != scanner.ParenOpen {
+						needSpace = true
+					}
 				}
+				if !needSpace && (slash || prevSlash) {
+					needSpace = true
+				}
+			}
+			if needSpace {
+				f.buf.WriteByte(' ')
 			}
 			afterBreak = false
 			f.buf.WriteString(
@@ -420,6 +457,7 @@ func (f *formatter) writeValueMultiLine(
 			)
 			prevEnd = tok.End
 			prevKind = tok.Kind
+			prevSlash = slash
 		}
 	}
 
@@ -746,6 +784,12 @@ func (f *formatter) writeSingleSelectorTo(
 	}
 }
 
+// isSlashDelim reports whether tok is a "/" delimiter.
+func (f *formatter) isSlashDelim(tok scanner.Token) bool {
+	return tok.Kind == scanner.Delim && tok.Offset < len(f.src) &&
+		f.src[tok.Offset] == '/'
+}
+
 // writeValueTo writes a value to a string builder.
 func (f *formatter) writeValueTo(
 	sb *strings.Builder,
@@ -753,22 +797,34 @@ func (f *formatter) writeValueTo(
 ) {
 	prevEnd := -1
 	prevKind := scanner.EOF
+	prevSlash := false
 	for _, tok := range v.Tokens {
 		if tok.Kind == scanner.Whitespace {
 			continue
 		}
-		if prevEnd >= 0 && tok.Offset > prevEnd {
-			if tok.Kind != scanner.ParenClose &&
-				prevKind != scanner.Function &&
-				prevKind != scanner.ParenOpen {
-				sb.WriteByte(' ')
+		slash := f.isSlashDelim(tok)
+		needSpace := false
+		if prevEnd >= 0 {
+			if tok.Offset > prevEnd {
+				if tok.Kind != scanner.ParenClose &&
+					prevKind != scanner.Function &&
+					prevKind != scanner.ParenOpen {
+					needSpace = true
+				}
 			}
+			if !needSpace && (slash || prevSlash) {
+				needSpace = true
+			}
+		}
+		if needSpace {
+			sb.WriteByte(' ')
 		}
 		sb.WriteString(
 			string(f.src[tok.Offset:tok.End]),
 		)
 		prevEnd = tok.End
 		prevKind = tok.Kind
+		prevSlash = slash
 	}
 }
 
