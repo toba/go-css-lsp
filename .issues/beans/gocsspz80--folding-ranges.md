@@ -7,6 +7,10 @@ priority: normal
 created_at: 2026-02-01T20:56:16Z
 updated_at: 2026-02-01T21:11:39Z
 parent: gocsse5ea
+sync:
+    github:
+        issue_number: "60"
+        synced_at: "2026-02-17T18:03:22Z"
 ---
 
 Provide folding ranges for CSS rule blocks, at-rules, and comment blocks.

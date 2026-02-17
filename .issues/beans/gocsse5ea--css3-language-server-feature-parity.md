@@ -6,6 +6,10 @@ type: milestone
 priority: normal
 created_at: 2026-02-01T20:55:41Z
 updated_at: 2026-02-01T21:19:22Z
+sync:
+    github:
+        issue_number: "44"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 Bring the Go CSS LSP to feature parity with vscode-css-languageservice (CSS3 only, no SCSS/Sass/LESS). Reference projects: microsoft/vscode-css-languageservice and lmn451/css-variables-zed.

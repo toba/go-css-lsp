@@ -6,6 +6,10 @@ type: feature
 priority: normal
 created_at: 2026-02-16T21:53:54Z
 updated_at: 2026-02-16T21:58:25Z
+sync:
+    github:
+        issue_number: "27"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 Two features from upstream:

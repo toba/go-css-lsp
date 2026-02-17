@@ -6,6 +6,10 @@ type: feature
 priority: normal
 created_at: 2026-02-02T00:32:52Z
 updated_at: 2026-02-02T00:34:14Z
+sync:
+    github:
+        issue_number: "41"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 When cmd-clicking a CSS variable like var(--color-link-icon), Zed highlights each hyphen-separated segment individually instead of the full variable name. Return LocationLink[] with originSelectionRange instead of Location to fix this.

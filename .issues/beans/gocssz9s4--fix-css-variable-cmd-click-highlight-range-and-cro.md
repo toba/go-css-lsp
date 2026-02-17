@@ -6,6 +6,10 @@ type: bug
 priority: normal
 created_at: 2026-02-02T16:12:16Z
 updated_at: 2026-02-02T16:13:34Z
+sync:
+    github:
+        issue_number: "1"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 Two bugs: (1) OriginSelectionRange covers var(--name) instead of just --name, (2) Cross-file variables not clickable when file not open in editor

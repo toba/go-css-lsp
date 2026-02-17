@@ -6,14 +6,6 @@ echo "==> Running pre-commit checks..."
 golangci-lint run
 go test ./...
 
-# Sync beans to ClickUp (non-blocking)
-if ! git diff --quiet HEAD 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    if command -v beanup &>/dev/null && [ -f .beans.clickup.yml ]; then
-        echo "==> Syncing beans to ClickUp..."
-        beanup --config .beans.clickup.yml sync >/dev/null 2>&1 &
-    fi
-fi
-
 # Stage and show changes
 echo "==> Staging changes..."
 git add -A
@@ -57,6 +49,12 @@ if [ "$PUSH" = "true" ]; then
     echo "==> Pushing commits..."
     git push
 
+    # Sync issues to GitHub
+    if command -v todo &>/dev/null; then
+        echo "==> Syncing issues to GitHub..."
+        todo sync
+    fi
+
     CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
     if [ -n "$CURRENT_TAG" ]; then
         echo "==> Current version: $CURRENT_TAG"
@@ -85,31 +83,7 @@ if [ "$PUSH" = "true" ]; then
         echo "==> Pushing tag (GoReleaser will create release)..."
         git push origin "$NEW_VERSION"
         echo "==> Tag $NEW_VERSION pushed, GoReleaser workflow will create release"
-
-        # Update Zed extension version (gossamer is sibling repo)
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        GOSSAMER_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)/../gossamer"
-        GOSSAMER_EXT_TOML="$GOSSAMER_DIR/extension.toml"
-        GOSSAMER_CARGO_TOML="$GOSSAMER_DIR/Cargo.toml"
-        if [ -f "$GOSSAMER_EXT_TOML" ]; then
-            # Strip 'v' prefix for toml files (uses 0.6.4 not v0.6.4)
-            EXT_VERSION=$(echo "$NEW_VERSION" | sed 's/^v//')
-            echo ""
-            echo "==> Updating gossamer to $EXT_VERSION..."
-            sed -i '' "s/^version = \".*\"/version = \"$EXT_VERSION\"/" "$GOSSAMER_EXT_TOML"
-            sed -i '' "s/^version = \".*\"/version = \"$EXT_VERSION\"/" "$GOSSAMER_CARGO_TOML"
-
-            # Commit and push the extension update
-            (
-                cd "$GOSSAMER_DIR"
-                git add extension.toml Cargo.toml
-                git commit -m "bump version to $EXT_VERSION"
-                git push
-                echo "==> gossamer updated and pushed"
-            )
-        else
-            echo "==> gossamer extension.toml not found at $GOSSAMER_EXT_TOML, skipping"
-        fi
+        echo "==> CI will dispatch version bump to gossamer extension"
     else
         echo "==> No existing tags, skipping version bump"
     fi

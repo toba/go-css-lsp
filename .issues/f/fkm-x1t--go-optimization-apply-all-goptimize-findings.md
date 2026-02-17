@@ -6,6 +6,10 @@ type: task
 priority: normal
 created_at: 2026-02-16T21:37:34Z
 updated_at: 2026-02-16T21:44:52Z
+sync:
+    github:
+        issue_number: "23"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 Apply all 22 findings from goptimize report:

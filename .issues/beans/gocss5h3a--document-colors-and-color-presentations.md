@@ -7,6 +7,10 @@ priority: high
 created_at: 2026-02-01T20:56:16Z
 updated_at: 2026-02-01T21:03:51Z
 parent: gocsse5ea
+sync:
+    github:
+        issue_number: "58"
+        synced_at: "2026-02-17T18:03:22Z"
 ---
 
 Detect color values in CSS documents and provide color presentations (format conversions).

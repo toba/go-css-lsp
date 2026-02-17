@@ -10,6 +10,10 @@ parent: gocsse5ea
 blocking:
     - gocsski7q
     - gocssd88w
+sync:
+    github:
+        issue_number: "56"
+        synced_at: "2026-02-17T18:03:22Z"
 ---
 
 Find all references to a CSS custom property within the document.

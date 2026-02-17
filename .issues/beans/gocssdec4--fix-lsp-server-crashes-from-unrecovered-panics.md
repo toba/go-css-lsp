@@ -6,6 +6,10 @@ type: bug
 priority: normal
 created_at: 2026-02-02T04:20:56Z
 updated_at: 2026-02-02T04:25:20Z
+sync:
+    github:
+        issue_number: "39"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 The LSP server crashes when any panic occurs during request handling because:

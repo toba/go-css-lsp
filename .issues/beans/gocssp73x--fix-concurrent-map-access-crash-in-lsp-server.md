@@ -6,6 +6,10 @@ type: bug
 priority: critical
 created_at: 2026-02-02T04:54:28Z
 updated_at: 2026-02-02T04:56:20Z
+sync:
+    github:
+        issue_number: "26"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 storage.RawFiles and storage.ParsedFiles are plain Go maps shared between the diagnostic goroutine (processDiagnosticNotification, writes at lines 1600/1603) and all request handlers (reads at 15+ locations). Go's runtime panics with an unrecoverable fatal error on concurrent map read/write, which cannot be caught by defer/recover. This kills the server process.

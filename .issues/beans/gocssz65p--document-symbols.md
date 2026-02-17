@@ -7,6 +7,10 @@ priority: high
 created_at: 2026-02-01T20:56:16Z
 updated_at: 2026-02-01T21:05:19Z
 parent: gocsse5ea
+sync:
+    github:
+        issue_number: "55"
+        synced_at: "2026-02-17T18:03:22Z"
 ---
 
 Provide document symbol outline for CSS files — selectors, at-rules, custom properties.

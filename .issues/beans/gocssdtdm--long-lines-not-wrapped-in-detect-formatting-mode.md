@@ -6,6 +6,10 @@ type: bug
 priority: normal
 created_at: 2026-02-01T23:40:18Z
 updated_at: 2026-02-01T23:44:53Z
+sync:
+    github:
+        issue_number: "20"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 In formatMode detect, long lines should still be wrapped if they exceed printWidth. Example line that stays unwrapped:

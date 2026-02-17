@@ -6,6 +6,10 @@ type: task
 priority: normal
 created_at: 2026-02-01T22:13:55Z
 updated_at: 2026-02-01T22:14:08Z
+sync:
+    github:
+        issue_number: "13"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 Add cross-repo version syncing to commit.sh so gossamer extension.toml and Cargo.toml are updated to match the LSP version on release, same as go-template-lsp/gozer pattern.

@@ -7,6 +7,10 @@ priority: normal
 created_at: 2026-02-01T20:56:17Z
 updated_at: 2026-02-01T21:13:00Z
 parent: gocsse5ea
+sync:
+    github:
+        issue_number: "61"
+        synced_at: "2026-02-17T18:03:22Z"
 ---
 
 Add additional diagnostic/lint rules matching vscode-css-languageservice.

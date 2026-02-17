@@ -6,6 +6,10 @@ type: bug
 priority: normal
 created_at: 2026-02-02T01:13:19Z
 updated_at: 2026-02-02T01:17:50Z
+sync:
+    github:
+        issue_number: "38"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 Fix false positives for outline:none, pointer-events:auto, font-family arbitrary names, and grid-area/grid-row/grid-column arbitrary idents

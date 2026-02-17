@@ -11,6 +11,10 @@ blocking:
     - gocssnrkb
     - gocsstxry
     - gocssd88w
+sync:
+    github:
+        issue_number: "51"
+        synced_at: "2026-02-17T18:03:22Z"
 ---
 
 Navigate from var(--name) usage to the --name definition within the same document (single-file first, workspace later).

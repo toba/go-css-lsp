@@ -6,6 +6,10 @@ type: feature
 priority: normal
 created_at: 2026-02-02T00:35:29Z
 updated_at: 2026-02-02T00:38:03Z
+sync:
+    github:
+        issue_number: "31"
+        synced_at: "2026-02-17T18:03:20Z"
 ---
 
 Add source.fixAll support so LSP clients can auto-fix simple diagnostics on save. Currently the only auto-fixable diagnostic is unnecessary unit (0deg→0, 0px→0, etc.).
