@@ -184,7 +184,25 @@ func main() {
 var extraValues = map[string][]string{
 	"outline":        {"none"},
 	"pointer-events": {"auto"},
-	"white-space":    {"normal", "nowrap", "pre", "pre-wrap", "pre-line", "break-spaces"},
+	"white-space": {
+		"normal",
+		"nowrap",
+		"pre",
+		"pre-wrap",
+		"pre-line",
+		"break-spaces",
+	},
+	"background-repeat": {
+		"repeat",
+		"repeat-x",
+		"repeat-y",
+		"no-repeat",
+		"space",
+		"round",
+	},
+	"background-position": {"top", "right", "bottom", "left", "center"},
+	"background-origin":   {"border-box", "padding-box", "content-box"},
+	"background-clip":     {"border-box", "padding-box", "content-box", "text"},
 }
 
 // Properties that accept arbitrary identifiers — clear their

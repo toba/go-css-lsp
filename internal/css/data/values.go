@@ -55,6 +55,19 @@ var NamedColors = []string{
 	"currentcolor",
 }
 
+// ShorthandLonghands maps shorthand properties to their
+// constituent longhand properties, enabling value validation
+// by merging longhand values into the shorthand's valid set.
+var ShorthandLonghands = map[string][]string{
+	"background": {
+		"background-attachment", "background-clip",
+		"background-color", "background-image",
+		"background-origin", "background-position",
+		"background-position-x", "background-position-y",
+		"background-repeat", "background-size",
+	},
+}
+
 // Units contains common CSS units.
 var Units = []string{
 	"px", "em", "rem", "vh", "vw", "vmin", "vmax",

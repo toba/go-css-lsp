@@ -555,6 +555,43 @@ func TestAnalyzeUnknownValue_FontFamilyGeneric(t *testing.T) {
 	}
 }
 
+func TestAnalyzeUnknownValue_BackgroundShorthand(t *testing.T) {
+	src := []byte(
+		`.x { background: url(/img.svg) no-repeat 0.5rem center / 1rem; }`,
+	)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	for _, val := range []string{"no-repeat", "center"} {
+		if _, ok := findDiagnostic(
+			diags,
+			UnknownValueMessage(val, "background"),
+		); ok {
+			t.Errorf(
+				"'%s' should be valid in background shorthand",
+				val,
+			)
+		}
+	}
+}
+
+func TestAnalyzeUnknownValue_BackgroundShorthandInvalid(
+	t *testing.T,
+) {
+	src := []byte(`.x { background: banana; }`)
+	ss := parseCSS(t, src)
+	diags := Analyze(ss, src, LintOptions{})
+
+	if _, ok := findDiagnostic(
+		diags,
+		UnknownValueMessage("banana", "background"),
+	); !ok {
+		t.Error(
+			"'banana' should be flagged as unknown in background",
+		)
+	}
+}
+
 func TestAnalyzeDeprecatedProperty_Warn(t *testing.T) {
 	src := []byte(`div { clip: rect(0, 0, 0, 0); }`)
 	ss := parseCSS(t, src)

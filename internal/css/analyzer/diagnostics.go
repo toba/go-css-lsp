@@ -240,6 +240,17 @@ func (a *diagAnalyzer) checkUnknownValues(
 		validValues[v] = true
 	}
 
+	// Merge longhand values for shorthand properties.
+	if longhands, ok := data.ShorthandLonghands[propName]; ok {
+		for _, lh := range longhands {
+			if lhProp := data.LookupProperty(lh); lhProp != nil {
+				for _, v := range lhProp.Values {
+					validValues[v] = true
+				}
+			}
+		}
+	}
+
 	sev := SeverityWarning
 	if a.opts.UnknownValues == UnknownValueError {
 		sev = SeverityError

@@ -283,6 +283,7 @@ var Properties = []Property{
 		Description: "Determines the background painting area.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/background-clip",
 		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+		Values: []string{"border-box", "padding-box", "content-box", "text"},
 	},
 	{
 		Name:        "background-color",
@@ -302,12 +303,20 @@ var Properties = []Property{
 		Description: "For elements rendered as a single box, specifies the background positioning area. For elements rendered as multiple boxes (e.g., inline boxes on several lines, boxes on several pages) specifies which boxes 'box-decoration-break' operates on to determine the background positioning area(s).",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/background-origin",
 		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+		Values: []string{"border-box", "padding-box", "content-box"},
 	},
 	{
 		Name:        "background-position",
 		Description: "Specifies the initial position of the background image(s) (after any resizing) within their corresponding background positioning area.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/background-position",
 		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+		Values: []string{
+			"top",
+			"right",
+			"bottom",
+			"left",
+			"center",
+		},
 	},
 	{
 		Name:        "background-position-x",
@@ -328,6 +337,14 @@ var Properties = []Property{
 		Description: "Specifies how background images are tiled after they have been sized and positioned.",
 		MDN:         "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/background-repeat",
 		Baseline: Baseline{Status: "high", LowDate: "2015-07-29", HighDate: "2018-01-29"},
+		Values: []string{
+			"repeat",
+			"repeat-x",
+			"repeat-y",
+			"no-repeat",
+			"space",
+			"round",
+		},
 	},
 	{
 		Name:        "background-size",
