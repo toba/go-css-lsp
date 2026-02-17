@@ -26,3 +26,15 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sync-extension:
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Dispatch version bump to gossamer
+        run: |
+          gh api repos/toba/gossamer/dispatches \
+            -f event_type=bump-version \
+            -f 'client_payload[version]=${{ github.ref_name }}'
+        env:
+          GH_TOKEN: ${{ secrets.EXTENSION_PAT }}
