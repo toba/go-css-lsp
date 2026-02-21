@@ -1,0 +1,65 @@
+upstream:
+    sources:
+        - repo: microsoft/vscode-css-languageservice
+          branch: main
+          relationship: feature reference for `internal/css/analyzer/` (completions, diagnostics, hover, formatting, colors, etc.), `internal/css/parser/`, `internal/css/scanner/`, `internal/css/data/`
+          last_checked_sha: bf53a6b88ef8906bb40dd46e2f91b32c9a0eac08
+          last_checked_date: "2025-12-01T19:27:06Z"
+          paths:
+            high:
+                - src/services/css*.ts
+                - src/parser/css*.ts
+            medium:
+                - src/services/lint*.ts
+                - src/services/pathCompletion.ts
+                - src/data/**
+                - src/languageFacts/**
+                - Package.json
+            low:
+                - .github/**
+                - README.md
+                - CHANGELOG.md
+                - docs/**
+                - .vscode/**
+                - '*.json'
+        - repo: lmn451/css-variables-zed
+          branch: master
+          relationship: css variable workspace indexing reference for `internal/css/workspace/index.go`
+          last_checked_sha: 55b6aefc5357c0e0e46910fc04c0ed9f0f316108
+          last_checked_date: "2026-02-10T11:19:27Z"
+          paths:
+            high:
+                - src/**/*.rs
+            medium:
+                - Cargo.toml
+                - tests/**
+            low:
+                - .github/**
+                - README.md
+                - extension.toml
+                - .gitignore
+nope:
+  rules:
+    - name: git-no-verify
+      pattern: 'git\s+.*--no-verify'
+      message: "--no-verify is never allowed - fix the issue that's failing the hook instead"
+
+    - name: git-checkout-switch
+      pattern: 'git\s+(checkout|switch)\s+'
+      message: "git checkout/switch not allowed - branch changes require user approval"
+
+    - name: git-commit-push
+      pattern: 'git\s+(commit|push)'
+      message: "git commit/push not allowed - only user should commit"
+
+    - name: todo-archive
+      pattern: 'todo\s+archive'
+      message: "todo archive not allowed - user must archive todos manually"
+
+todo:
+  default_status: draft
+  default_type: task
+  path: .issues
+  sync:
+    github:
+      repo: toba/go-css-lsp

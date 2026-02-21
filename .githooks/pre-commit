@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+echo "==> Running lint..."
+golangci-lint run
+
+echo "==> Running tests..."
+go test ./...
