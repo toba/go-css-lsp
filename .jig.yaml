@@ -1,0 +1,58 @@
+citations:
+    - repo: microsoft/vscode-css-languageservice
+      branch: main
+      last_checked_sha: 39d6045682c5a10ca82d81b1b4ce4ef5de97f2fa
+      last_checked_date: "2026-02-24T17:50:54Z"
+      paths:
+        high:
+            - src/services/css*.ts
+            - src/parser/css*.ts
+        medium:
+            - src/services/lint*.ts
+            - src/services/pathCompletion.ts
+            - src/data/**
+            - src/languageFacts/**
+            - Package.json
+        low:
+            - .github/**
+            - README.md
+            - CHANGELOG.md
+            - docs/**
+            - .vscode/**
+            - '*.json'
+    - repo: lmn451/css-variables-zed
+      branch: master
+      last_checked_sha: fcfec01f33e09c0426550a7094b684689eb84a79
+      last_checked_date: "2026-02-24T17:50:54Z"
+      paths:
+        high:
+            - src/**/*.rs
+        medium:
+            - Cargo.toml
+            - tests/**
+        low:
+            - .github/**
+            - README.md
+            - extension.toml
+            - .gitignore
+nope:
+    rules:
+        - name: git-no-verify
+          pattern: 'git\s+.*--no-verify'
+          message: "--no-verify is never allowed - fix the issue that's failing the hook instead"
+        - name: git-checkout-switch
+          pattern: 'git\s+(checkout|switch)\s+'
+          message: "git checkout/switch not allowed - branch changes require user approval"
+        - name: git-commit-push
+          pattern: 'git\s+(commit|push)'
+          message: "git commit/push not allowed - only user should commit"
+        - name: todo-archive
+          pattern: 'todo\s+archive'
+          message: "todo archive not allowed - user must archive todos manually"
+todo:
+    default_status: draft
+    default_type: task
+    path: .issues
+    sync:
+        github:
+            repo: toba/go-css-lsp

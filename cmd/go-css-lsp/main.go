@@ -190,8 +190,8 @@ func main() {
 
 	if scanner.Err() != nil {
 		slog.Error(
-			"error while closing LSP: " +
-				scanner.Err().Error(),
+			"error while closing LSP",
+			"err", scanner.Err(),
 		)
 	}
 }
@@ -1252,8 +1252,9 @@ func unmarshalRequest[T any](
 	var req lsp.RequestMessage[T]
 	if err := json.Unmarshal(data, &req); err != nil {
 		slog.Warn(
-			"Error unmarshalling " + label +
-				" request: " + err.Error(),
+			"error unmarshalling request",
+			"label", label,
+			"err", err,
 		)
 		return req, false
 	}
@@ -1501,7 +1502,8 @@ func uriToFilePath(uri string) string {
 	u, err := url.Parse(uri)
 	if err != nil {
 		slog.Error(
-			"unable to parse URI: " + err.Error(),
+			"unable to parse URI",
+			"err", err,
 		)
 		return ""
 	}

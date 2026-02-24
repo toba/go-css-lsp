@@ -29,4 +29,3 @@ coverage.html
 
 # Claude Code
 /.claude/settings.local.json
-/.claude/skills/*/.last-checked

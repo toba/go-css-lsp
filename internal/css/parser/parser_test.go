@@ -523,6 +523,190 @@ func TestNestedFunctionValues(t *testing.T) {
 	}
 }
 
+func TestParseContainerRule(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "name only, no query",
+			src:  `@container card { #inner { background-color: skyblue; }}`,
+		},
+		{
+			name: "size query",
+			src:  `@container (width <= 150px) { #inner { background-color: skyblue; }}`,
+		},
+		{
+			name: "name with size and style query",
+			src:  `@container card (inline-size > 30em) and style(--responsive: true) { }`,
+		},
+		{
+			name: "standalone custom property in style()",
+			src:  `@container card style(--responsive) { }`,
+		},
+		{
+			name: "comma-separated queries",
+			src:  `@container (inline-size > 30em), style(--responsive: true) { }`,
+		},
+		{
+			name: "comma-separated with name",
+			src:  `@container card (inline-size > 30em), style(--responsive: true) { }`,
+		},
+		{
+			name: "comma-separated with different names",
+			src:  `@container card (inline-size > 30em), summary style(--responsive: true) { }`,
+		},
+		{
+			name: "nested container",
+			src:  `@container card (inline-size > 30em) { @container style(--responsive: true) {} }`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ss, errs := Parse([]byte(tt.src))
+			if len(errs) != 0 {
+				t.Fatalf("unexpected errors: %v", errs)
+			}
+			if len(ss.Children) == 0 {
+				t.Fatal("expected at least 1 child")
+			}
+			at, ok := ss.Children[0].(*AtRule)
+			if !ok {
+				t.Fatalf("expected AtRule, got %T", ss.Children[0])
+			}
+			if at.Name != "container" {
+				t.Errorf("expected 'container', got %q", at.Name)
+			}
+			if at.Block == nil {
+				t.Error("expected block in @container rule")
+			}
+		})
+	}
+}
+
+func TestParseIfFunction(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "media condition with else",
+			src:  `div { color: if(media(print): black; else: white); }`,
+		},
+		{
+			name: "empty branches",
+			src:  `div { color: if(media(print): ; else: ); }`,
+		},
+		{
+			name: "no trailing semicolon",
+			src:  `div { color: if(media(print): black; else: white); }`,
+		},
+		{
+			name: "style condition",
+			src:  `div { color: if(style(--some-var: true): black); }`,
+		},
+		{
+			name: "else only",
+			src:  `div { color: if(else: white); }`,
+		},
+		{
+			name: "nested in value",
+			src:  `div { background: if(media(print): white; else: url("bg.png")); }`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ss, errs := Parse([]byte(tt.src))
+			if len(errs) != 0 {
+				t.Fatalf("unexpected errors: %v", errs)
+			}
+			if len(ss.Children) == 0 {
+				t.Fatal("expected at least 1 child")
+			}
+			rs, ok := ss.Children[0].(*Ruleset)
+			if !ok {
+				t.Fatalf("expected Ruleset, got %T", ss.Children[0])
+			}
+			decls := rs.Declarations()
+			if len(decls) == 0 {
+				t.Fatal("expected at least 1 declaration")
+			}
+			if decls[0].Value == nil || len(decls[0].Value.Tokens) == 0 {
+				t.Fatal("expected value tokens in declaration")
+			}
+		})
+	}
+}
+
+func TestParseScopeRule(t *testing.T) {
+	tests := []struct {
+		name        string
+		src         string
+		wantPrelude bool // true if prelude tokens expected
+	}{
+		{
+			name:        "single scope root",
+			src:         `@scope (.card) { .title { color: red; } }`,
+			wantPrelude: true,
+		},
+		{
+			name:        "scope root selector list",
+			src:         `@scope (.card, .aside) { .title { color: red; } }`,
+			wantPrelude: true,
+		},
+		{
+			name:        "scope root and limit",
+			src:         `@scope (.card) to (.header) { .title { color: red; } }`,
+			wantPrelude: true,
+		},
+		{
+			name:        "scope root and limit both selector lists",
+			src:         `@scope (.card, .aside) to (.header, .footer) { .title { color: red; } }`,
+			wantPrelude: true,
+		},
+		{
+			name:        "scope without root (implicit)",
+			src:         `@scope { .title { color: red; } }`,
+			wantPrelude: false,
+		},
+		{
+			name:        "scope limit only",
+			src:         `@scope to (.footer) { .title { color: red; } }`,
+			wantPrelude: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ss, errs := Parse([]byte(tt.src))
+			if len(errs) != 0 {
+				t.Fatalf("unexpected errors: %v", errs)
+			}
+			if len(ss.Children) == 0 {
+				t.Fatal("expected at least 1 child")
+			}
+			at, ok := ss.Children[0].(*AtRule)
+			if !ok {
+				t.Fatalf("expected AtRule, got %T", ss.Children[0])
+			}
+			if at.Name != "scope" {
+				t.Errorf("expected 'scope', got %q", at.Name)
+			}
+			if at.Block == nil {
+				t.Error("expected block in @scope rule")
+			}
+			if tt.wantPrelude && len(at.Prelude) == 0 {
+				t.Error("expected prelude tokens")
+			}
+			if !tt.wantPrelude && len(at.Prelude) != 0 {
+				t.Errorf("expected no prelude tokens, got %d", len(at.Prelude))
+			}
+		})
+	}
+}
+
 func TestCommentsBetweenDeclarations(t *testing.T) {
 	src := `body {
   color: red;

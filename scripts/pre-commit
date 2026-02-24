@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Pre-commit hook: lint, format, and build.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "${repo_root}"
+
+echo "==> Running golangci-lint..."
+bash scripts/lint.sh
+
+echo "==> Running go fmt..."
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+  echo "The following files need formatting:"
+  echo "$unformatted"
+  exit 1
+fi
+
+echo "==> Running go build..."
+go build ./...
+
+echo "All pre-commit checks passed."

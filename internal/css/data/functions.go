@@ -155,6 +155,17 @@ var Functions = []Function{
 		},
 	},
 
+	// Conditional
+	{
+		Name:        "if",
+		Description: "Evaluates a conditional expression, returning one of the given values based on a condition.",
+		MDN:         "https://developer.mozilla.org/docs/Web/CSS/if",
+		Signatures: []string{
+			"if(<condition>: <value>; else: <value>)",
+			"if(<condition>: <value>; <condition>: <value>; else: <value>)",
+		},
+	},
+
 	// Custom properties
 	{
 		Name:        "var",

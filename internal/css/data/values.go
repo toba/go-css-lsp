@@ -90,7 +90,7 @@ var ColorFunctions = []string{
 // CommonFunctions are non-color CSS functions.
 var CommonFunctions = []string{
 	"calc", "min", "max", "clamp",
-	"var", "env",
+	"var", "env", "if",
 	"url",
 	"linear-gradient", "radial-gradient",
 	"conic-gradient",

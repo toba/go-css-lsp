@@ -1,7 +1,0 @@
-# Dev tool version management via mise (https://mise.jdx.dev/)
-# Run `mise install` to install all tools
-# Run `mise use <tool>@<version>` to update a tool version
-
-[tools]
-go = "latest"
-golangci-lint = "latest"

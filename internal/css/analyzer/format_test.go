@@ -1059,3 +1059,65 @@ func TestFormatPreserve_PreservesBlankLineBetweenDeclarations(t *testing.T) {
 		t.Errorf("got:\n%s\nwant:\n%s", result, expected)
 	}
 }
+
+func TestFormat_ScopeWithSelectorList(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      string
+		expected string
+	}{
+		{
+			name: "single scope root",
+			src:  `@scope (.card) { .title { color: red; } }`,
+			expected: `@scope (.card) {
+  .title {
+    color: red;
+  }
+}
+`,
+		},
+		{
+			name: "scope root selector list",
+			src:  `@scope (.card, .aside) { .title { color: red; } }`,
+			expected: `@scope (.card, .aside) {
+  .title {
+    color: red;
+  }
+}
+`,
+		},
+		{
+			name: "scope root and limit with selector lists",
+			src:  `@scope (.card, .aside) to (.header, .footer) { .title { color: red; } }`,
+			expected: `@scope (.card, .aside) to (.header, .footer) {
+  .title {
+    color: red;
+  }
+}
+`,
+		},
+		{
+			name: "scope without root",
+			src:  `@scope { .title { color: red; } }`,
+			expected: `@scope {
+  .title {
+    color: red;
+  }
+}
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ss, _ := parser.Parse([]byte(tt.src))
+			result := Format(ss, []byte(tt.src), FormatOptions{
+				TabSize:      2,
+				InsertSpaces: true,
+			})
+			if result != tt.expected {
+				t.Errorf("got:\n%s\nwant:\n%s", result, tt.expected)
+			}
+		})
+	}
+}
