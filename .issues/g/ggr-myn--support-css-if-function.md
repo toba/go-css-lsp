@@ -8,6 +8,10 @@ tags:
     - upstream
 created_at: 2026-02-24T17:51:51Z
 updated_at: 2026-02-24T17:59:31Z
+sync:
+    github:
+        issue_number: "67"
+        synced_at: "2026-02-24T18:07:11Z"
 ---
 
 Upstream vscode-css-languageservice added support for the new CSS `if()` function ([2a8cf1f](https://github.com/microsoft/vscode-css-languageservice/commit/2a8cf1f48c24acef49206826aabab1da85eab2ab), PR #472).

@@ -8,6 +8,10 @@ tags:
     - upstream
 created_at: 2026-02-24T17:51:51Z
 updated_at: 2026-02-24T17:56:14Z
+sync:
+    github:
+        issue_number: "66"
+        synced_at: "2026-02-24T18:07:11Z"
 ---
 
 Upstream vscode-css-languageservice fixed `@container` query parsing ([54c68ce](https://github.com/microsoft/vscode-css-languageservice/commit/54c68cec52cf7cf0aac0ad45297c5b22e17d73ce), PR #473).

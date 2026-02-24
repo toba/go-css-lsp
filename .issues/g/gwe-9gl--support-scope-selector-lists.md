@@ -8,6 +8,10 @@ tags:
     - upstream
 created_at: 2026-02-24T17:51:51Z
 updated_at: 2026-02-24T18:03:17Z
+sync:
+    github:
+        issue_number: "65"
+        synced_at: "2026-02-24T18:07:11Z"
 ---
 
 Upstream vscode-css-languageservice added support for selector lists in `@scope` rules ([39d6045](https://github.com/microsoft/vscode-css-languageservice/commit/39d6045682c5a10ca82d81b1b4ce4ef5de97f2fa), PR #474).
