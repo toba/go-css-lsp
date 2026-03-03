@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"go/format"
 	"log"
 	"os"
 	"path/filepath"
@@ -526,8 +527,12 @@ func generatePseudo(outDir string, classes []cssPseudoClass, elements []cssPseud
 }
 
 func writeFile(path, content string) {
+	formatted, err := format.Source([]byte(content))
+	if err != nil {
+		log.Fatalf("formatting %s: %v", path, err)
+	}
 	//nolint:gosec // generated source files need 0o644
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, formatted, 0o644); err != nil {
 		log.Fatalf("writing %s: %v", path, err)
 	}
 }
