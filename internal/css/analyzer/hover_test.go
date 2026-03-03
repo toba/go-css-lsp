@@ -278,14 +278,14 @@ func TestHoverPropertyNoBaseline(t *testing.T) {
 func TestHoverExperimentalNoBaseline(t *testing.T) {
 	// Experimental properties should show experimental
 	// tag but suppress baseline info.
-	src := []byte(`body { field-sizing: content; }`)
+	src := []byte(`body { initial-letter-align: auto; }`)
 	ss, _ := parser.Parse(src)
 
-	// "field-sizing" starts at byte 7
+	// "initial-letter-align" starts at byte 7
 	hr := Hover(ss, src, 8)
 	if !hr.Found {
 		t.Skip(
-			"field-sizing not in data, skipping",
+			"initial-letter-align not in data, skipping",
 		)
 	}
 	if !strings.Contains(hr.Content, "Experimental") {

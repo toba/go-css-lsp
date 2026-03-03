@@ -1,5 +1,11 @@
 # Changelog
 
+## Week of Mar 1 – Mar 7, 2026
+
+### 🗜️ Tweaks
+
+- Update vscode-custom-data submodule to v0.6.3; 37 new properties, updated baseline/experimental status ([#68](https://github.com/toba/go-css-lsp/issues/68))
+
 ## Week of Feb 22 – Feb 28, 2026
 
 ### ✨ Features
