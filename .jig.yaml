@@ -1,8 +1,8 @@
 citations:
     - repo: microsoft/vscode-css-languageservice
       branch: main
-      last_checked_sha: 39d6045682c5a10ca82d81b1b4ce4ef5de97f2fa
-      last_checked_date: "2026-02-24T17:50:54Z"
+      last_checked_sha: 54c68cec52cf7cf0aac0ad45297c5b22e17d73ce
+      last_checked_date: "2026-03-03T17:52:37Z"
       paths:
         high:
             - src/services/css*.ts
@@ -22,8 +22,8 @@ citations:
             - '*.json'
     - repo: lmn451/css-variables-zed
       branch: master
-      last_checked_sha: fcfec01f33e09c0426550a7094b684689eb84a79
-      last_checked_date: "2026-02-24T17:50:54Z"
+      last_checked_sha: 8c9f98465a75f8972287a63eaecb60bb56d6cfd8
+      last_checked_date: "2026-03-03T17:52:37Z"
       paths:
         high:
             - src/**/*.rs
@@ -49,6 +49,8 @@ nope:
         - name: todo-archive
           pattern: 'todo\s+archive'
           message: "todo archive not allowed - user must archive todos manually"
+companions:
+    zed: toba/gossamer
 todo:
     default_status: draft
     default_type: task
