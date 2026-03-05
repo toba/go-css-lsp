@@ -104,6 +104,12 @@ func (f *formatter) formatStylesheet(ss *parser.Stylesheet) {
 		case *parser.AtRule:
 			f.formatAtRule(n)
 		case *parser.Comment:
+			if i > 0 && f.isInlineComment(
+				ss.Children[i-1].End(), n.StartPos,
+			) {
+				f.formatInlineComment(n)
+				continue
+			}
 			f.formatComment(n)
 		}
 	}
@@ -168,6 +174,12 @@ func (f *formatter) formatRulesetBody(rs *parser.Ruleset) {
 			}
 			f.formatAtRule(n)
 		case *parser.Comment:
+			if i > 0 && f.isInlineComment(
+				rs.Children[i-1].End(), n.StartPos,
+			) {
+				f.formatInlineComment(n)
+				continue
+			}
 			if i > 0 {
 				switch f.opts.Mode {
 				case FormatCompact:
@@ -680,6 +692,12 @@ func (f *formatter) formatAtRuleExpanded(ar *parser.AtRule) {
 			case *parser.AtRule:
 				f.formatAtRule(n)
 			case *parser.Comment:
+				if i > 0 && f.isInlineComment(
+					ar.Block.Children[i-1].End(), n.StartPos,
+				) {
+					f.formatInlineComment(n)
+					continue
+				}
 				f.formatComment(n)
 			}
 		}
@@ -697,6 +715,38 @@ func (f *formatter) formatComment(c *parser.Comment) {
 		string(f.src[c.StartPos:c.EndPos]),
 	)
 	f.buf.WriteByte('\n')
+}
+
+// formatInlineComment writes a comment on the same line as
+// the preceding declaration (replacing the newline the
+// declaration already emitted).
+func (f *formatter) formatInlineComment(c *parser.Comment) {
+	// The preceding declaration wrote ";\n" — strip the trailing
+	// newline so we can append the comment on the same line.
+	s := f.buf.String()
+	if s != "" && s[len(s)-1] == '\n' {
+		f.buf.Reset()
+		f.buf.WriteString(s[:len(s)-1])
+	}
+	f.buf.WriteByte(' ')
+	f.buf.WriteString(
+		string(f.src[c.StartPos:c.EndPos]),
+	)
+	f.buf.WriteByte('\n')
+}
+
+// isInlineComment reports whether the comment at position
+// commentStart is on the same source line as prevEnd.
+func (f *formatter) isInlineComment(
+	prevEnd, commentStart int,
+) bool {
+	if prevEnd < 0 || commentStart <= prevEnd ||
+		commentStart > len(f.src) {
+		return false
+	}
+	return !bytes.ContainsRune(
+		f.src[prevEnd:commentStart], '\n',
+	)
 }
 
 // indentWidth returns the character width of the current

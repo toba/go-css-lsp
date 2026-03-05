@@ -1060,6 +1060,30 @@ func TestFormatPreserve_PreservesBlankLineBetweenDeclarations(t *testing.T) {
 	}
 }
 
+func TestFormat_InlineCommentAfterDeclaration(t *testing.T) {
+	src := []byte(`:root {
+  --score-floor: 8;       /* scores ≤ this → pure red */
+  --score-ceil: 12;       /* scores ≥ this → pure green */
+  --hue-red: 25;          /* oklch hue at floor (red) */
+}`)
+	ss, _ := parser.Parse(src)
+	result := Format(ss, src, FormatOptions{
+		TabSize:      2,
+		InsertSpaces: true,
+	})
+
+	expected := `:root {
+  --score-floor: 8; /* scores ≤ this → pure red */
+  --score-ceil: 12; /* scores ≥ this → pure green */
+  --hue-red: 25; /* oklch hue at floor (red) */
+}
+`
+	if result != expected {
+		t.Errorf("format mismatch:\ngot:\n%s\nwant:\n%s",
+			result, expected)
+	}
+}
+
 func TestFormat_ScopeWithSelectorList(t *testing.T) {
 	tests := []struct {
 		name     string
