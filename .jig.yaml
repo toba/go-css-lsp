@@ -49,8 +49,7 @@ nope:
         - name: todo-archive
           pattern: 'todo\s+archive'
           message: "todo archive not allowed - user must archive todos manually"
-companions:
-    zed: toba/gossamer
+zed_extension: toba/gossamer
 todo:
     default_status: draft
     default_type: task
@@ -58,3 +57,4 @@ todo:
     sync:
         github:
             repo: toba/go-css-lsp
+changelog: weekly
