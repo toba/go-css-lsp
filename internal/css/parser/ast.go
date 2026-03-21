@@ -2,7 +2,7 @@
 package parser
 
 import (
-	"github.com/toba/go-css-lsp/internal/css/scanner"
+	"github.com/toba/css-lsp/internal/css/scanner"
 )
 
 // NodeKind identifies the type of AST node.

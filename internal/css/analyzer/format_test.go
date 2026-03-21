@@ -3,7 +3,7 @@ package analyzer
 import (
 	"testing"
 
-	"github.com/toba/go-css-lsp/internal/css/parser"
+	"github.com/toba/css-lsp/internal/css/parser"
 )
 
 func TestFormat_BasicRuleset(t *testing.T) {

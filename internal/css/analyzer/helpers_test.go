@@ -3,7 +3,7 @@ package analyzer
 import (
 	"testing"
 
-	"github.com/toba/go-css-lsp/internal/css/parser"
+	"github.com/toba/css-lsp/internal/css/parser"
 )
 
 // indexOf returns the byte offset of substr in src, or -1.

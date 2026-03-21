@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/toba/go-css-lsp/internal/css/parser"
-	"github.com/toba/go-css-lsp/internal/css/scanner"
+	"github.com/toba/css-lsp/internal/css/parser"
+	"github.com/toba/css-lsp/internal/css/scanner"
 )
 
 const (

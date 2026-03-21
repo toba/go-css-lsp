@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/toba/go-css-lsp/internal/css/analyzer"
+	"github.com/toba/css-lsp/internal/css/analyzer"
 )
 
 var filesOpenedByEditor = make(map[string]string)

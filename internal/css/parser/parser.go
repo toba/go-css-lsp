@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/toba/go-css-lsp/internal/css/scanner"
+	"github.com/toba/css-lsp/internal/css/scanner"
 )
 
 // Parser performs recursive descent parsing of CSS.

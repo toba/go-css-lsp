@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	"github.com/toba/go-css-lsp/internal/css/parser"
+	"github.com/toba/css-lsp/internal/css/parser"
 )
 
 // SelectionRange represents a nested selection range.

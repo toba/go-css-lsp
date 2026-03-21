@@ -1,5 +1,16 @@
 # Changelog
 
+## Week of Mar 15 – Mar 21, 2026
+
+### ✨ Features
+
+- Migrate to `go.lsp.dev/protocol` + `go.lsp.dev/jsonrpc2` ([#69](https://github.com/toba/go-css-lsp/issues/69))
+- Adopt shared `github.com/toba/lsp` module ([#71](https://github.com/toba/go-css-lsp/issues/71))
+
+### 🗜️ Tweaks
+
+- Migrate to `toba/lsp` server harness ([#70](https://github.com/toba/go-css-lsp/issues/70))
+
 ## Week of Mar 1 – Mar 7, 2026
 
 ### 🗜️ Tweaks

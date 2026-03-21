@@ -3,8 +3,8 @@
 package css
 
 import (
-	"github.com/toba/go-css-lsp/internal/css/analyzer"
-	"github.com/toba/go-css-lsp/internal/css/parser"
+	"github.com/toba/css-lsp/internal/css/analyzer"
+	"github.com/toba/css-lsp/internal/css/parser"
 )
 
 // ParseResult holds the parsed AST and any errors.

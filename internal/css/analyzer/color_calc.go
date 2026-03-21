@@ -3,7 +3,7 @@ package analyzer
 import (
 	"strconv"
 
-	"github.com/toba/go-css-lsp/internal/css/scanner"
+	"github.com/toba/css-lsp/internal/css/scanner"
 )
 
 // isMinusToken returns true if the token represents a minus

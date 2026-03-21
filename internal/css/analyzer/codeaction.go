@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/toba/go-css-lsp/internal/css/data"
+	"github.com/toba/css-lsp/internal/css/data"
 )
 
 // CodeActionKind constants.

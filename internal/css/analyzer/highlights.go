@@ -1,8 +1,8 @@
 package analyzer
 
 import (
-	"github.com/toba/go-css-lsp/internal/css/parser"
-	"github.com/toba/go-css-lsp/internal/css/scanner"
+	"github.com/toba/css-lsp/internal/css/parser"
+	"github.com/toba/css-lsp/internal/css/scanner"
 )
 
 // DocumentHighlight represents a highlighted range.

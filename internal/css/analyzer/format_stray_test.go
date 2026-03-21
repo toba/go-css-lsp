@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/toba/go-css-lsp/internal/css/parser"
+	"github.com/toba/css-lsp/internal/css/parser"
 )
 
 // TestFormat_NoStrayBraceRuleset checks that various nested CSS
